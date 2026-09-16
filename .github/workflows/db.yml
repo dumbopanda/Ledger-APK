@@ -1,0 +1,32 @@
+name: Database
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+  pull_request:
+    paths:
+      - "supabase/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Full clean bootstrap, then an explicit reset -- catches a migration
+      # that only works when applied incrementally on top of manual dev-time
+      # tweaks, not from scratch.
+      - name: Start local Supabase stack
+        run: supabase start
+
+      - name: Reset database (applies every migration from scratch)
+        run: supabase db reset
+
+      - name: Run pgTAP suite
+        run: supabase test db --local
