@@ -15,7 +15,7 @@ create policy accounts_insert on public.accounts for insert with check (user_id 
 create policy accounts_update on public.accounts for update
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-create policy entries_select on public.entries for select using (true);
+create policy entries_select on public.entries for select using (user_id = auth.uid());
 create policy entries_insert on public.entries for insert with check (user_id = auth.uid());
 create policy entries_update on public.entries for update
   using (user_id = auth.uid()) with check (user_id = auth.uid());
