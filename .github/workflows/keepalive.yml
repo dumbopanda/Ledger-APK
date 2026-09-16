@@ -1,0 +1,21 @@
+name: Keepalive
+
+on:
+  schedule:
+    - cron: "0 6 */3 * *" # every 3 days — well under Supabase's 7-day free-tier pause
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install postgresql-client 17 (matches project's Postgres version)
+        run: |
+          sudo apt-get install -y wget ca-certificates
+          wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/postgresql.asc > /dev/null
+          echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Ping database
+        run: psql "${{ secrets.SUPABASE_DB_URL }}" -c "select 1;"
