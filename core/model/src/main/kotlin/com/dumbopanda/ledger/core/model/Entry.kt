@@ -20,8 +20,13 @@ data class Entry(
 ) {
     init {
         require(clientUid.length in 8..64)
+        require(entryDate >= MIN_ENTRY_DATE)
         require(expenseName.trim().length in 1..120)
         require(txnType.trim().length in 1..60)
         require(moreInfo == null || moreInfo.length <= 300)
+    }
+
+    companion object {
+        private val MIN_ENTRY_DATE: LocalDate = LocalDate.of(2000, 1, 1)
     }
 }
