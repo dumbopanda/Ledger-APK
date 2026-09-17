@@ -31,9 +31,12 @@ android {
 dependencies {
     implementation(project(":core:model"))
 
-    implementation(platform(libs.supabase.bom))
-    implementation(libs.supabase.postgrest)
-    implementation(libs.supabase.auth)
+    // api, not implementation: SupabaseModule provides a SupabaseClient for
+    // injection elsewhere (core:data's AuthRepository), so consumers need
+    // these types on their own compile classpath, not just core:network's.
+    api(platform(libs.supabase.bom))
+    api(libs.supabase.postgrest)
+    api(libs.supabase.auth)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)

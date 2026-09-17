@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- D9: allowBackup="false" already blocks cloud backup; this additionally
+     blocks device-to-device transfer, which is a separate mechanism on
+     newer Android versions and not covered by allowBackup alone. -->
+<data-extraction-rules>
+    <cloud-backup disableIfNoEncryptionCapability="false">
+        <exclude domain="root" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+    </device-transfer>
+</data-extraction-rules>
