@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option java_package = "com.dumbopanda.ledger.core.datastore";
+option java_multiple_files = true;
+
+// §5.6 — as in the prototype, three values. Not the auth session: that is
+// EncryptedSharedPreferences (AES-256-GCM, Keystore-backed), never plain
+// DataStore, per §7.3. Wired at A13 alongside sign-in, not here.
+enum SyncMode {
+  SYNC_MODE_UNSPECIFIED = 0;
+  SYNC_MODE_SMART = 1;
+  SYNC_MODE_INSTANT = 2;
+  SYNC_MODE_MANUAL = 3;
+}
+
+message UserPrefs {
+  SyncMode sync_mode = 1;
+}

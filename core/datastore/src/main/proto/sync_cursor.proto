@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option java_package = "com.dumbopanda.ledger.core.datastore";
+option java_multiple_files = true;
+
+// One cursor per synced table (§5.4). Keyset pagination needs both fields
+// together — a plain "last updated_at" alone drops rows that share a
+// timestamp across a page boundary.
+message SyncCursor {
+  int64 last_updated_at_epoch_millis = 1;
+  string last_id = 2;
+  bool has_pulled = 3;
+}
+
+message SyncCursors {
+  SyncCursor entries = 1;
+  SyncCursor accounts = 2;
+}
