@@ -155,6 +155,10 @@ class FakeSyncApi : SyncApi {
         return PushResultRow(clientUid = clientUid, id = row.id, updatedAt = updatedAt.toString(), wasInsert = wasInsert)
     }
 
+    // Test-only introspection: null = no such row ever reached the server,
+    // true/false = whether it's currently (soft-)deleted there.
+    fun entryIsDeleted(clientUid: String): Boolean? = entries[clientUid]?.let { it.deletedAt != null }
+
     private fun page(store: Map<String, Row>, sinceEpochMillis: Long?, sinceId: String?, limit: Int): List<Row> {
         val since = sinceEpochMillis?.let { Instant.ofEpochMilli(it) } ?: Instant.EPOCH.minusMillis(1)
         val sinceIdOrEmpty = sinceId ?: ""

@@ -53,4 +53,10 @@ interface EntryDao {
     // next pull upserts a second, server-id-keyed copy of the same row.
     @Query("""UPDATE entries SET id = :serverId, updatedAt = :updatedAt WHERE clientUid = :clientUid""")
     suspend fun reconcileServerId(clientUid: String, serverId: String, updatedAt: Instant)
+
+    // §5.2's insert+delete rule: the entity never reached the server, so
+    // there is nothing to keep a tombstone for -- unlike every other delete
+    // path, which soft-deletes (sets deletedAt) instead.
+    @Query("""DELETE FROM entries WHERE clientUid = :clientUid""")
+    suspend fun deleteByClientUid(clientUid: String)
 }
