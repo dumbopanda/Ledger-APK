@@ -10,7 +10,9 @@ val Forest = Color(0xFF0E7955)
 val Lime = Color(0xFFCCF244)
 val Mint = Color(0xFFDDF3E4)
 val Amber = Color(0xFFFFDE73)
-val Coral = Color(0xFFE04848)
+// Branding doc's #E04848 is ~3.6:1 on CanvasLight, failing WCAG AA -- and
+// it's the color of every expense amount. Darkened to clear 4.98:1 (§6.3).
+val Coral = Color(0xFFC62828)
 val TextDark = Color(0xFF181C1A)
 
 // #78756E on CanvasLight is ~3.9:1, failing WCAG AA for body text (§6.3, §10.5).

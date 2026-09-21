@@ -8,4 +8,9 @@ interface AuthRepository {
     suspend fun signInWithGoogleIdToken(idToken: String, rawNonce: String): Result<String>
 
     suspend fun signOut()
+
+    // §5.3 rule 5: on a push's 401, refresh once and retry once before
+    // giving up to SessionExpired. Returns false if the refresh itself fails
+    // (e.g. the refresh token is also invalid).
+    suspend fun refreshSession(): Boolean
 }

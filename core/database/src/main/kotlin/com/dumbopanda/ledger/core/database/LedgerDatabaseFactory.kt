@@ -2,6 +2,7 @@ package com.dumbopanda.ledger.core.database
 
 import android.content.Context
 import androidx.room.Room
+import com.dumbopanda.ledger.core.database.migration.MIGRATION_1_2
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,7 +16,9 @@ class LedgerDatabaseFactory @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     fun open(userId: String): LedgerDatabase =
-        Room.databaseBuilder(context, LedgerDatabase::class.java, fileNameFor(userId)).build()
+        Room.databaseBuilder(context, LedgerDatabase::class.java, fileNameFor(userId))
+            .addMigrations(MIGRATION_1_2)
+            .build()
 
     companion object {
         fun fileNameFor(userId: String): String {

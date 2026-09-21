@@ -49,4 +49,16 @@ class SupabaseAuthRepository @Inject constructor(
         supabase.auth.signOut()
         sessionStore.clear()
     }
+
+    override suspend fun refreshSession(): Boolean = runCatching {
+        supabase.auth.refreshCurrentSession()
+        val session = requireNotNull(supabase.auth.currentSessionOrNull())
+        sessionStore.write(
+            Session(
+                userId = session.user?.id ?: error("Refreshed session has no user id"),
+                accessToken = session.accessToken,
+                refreshToken = session.refreshToken,
+            ),
+        )
+    }.onFailure { e -> Log.e(TAG, "refreshSession failed", e) }.isSuccess
 }

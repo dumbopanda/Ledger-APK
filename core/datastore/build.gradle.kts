@@ -31,8 +31,12 @@ protobuf {
 dependencies {
     implementation(project(":core:model"))
 
-    implementation(libs.androidx.datastore.core)
-    implementation(libs.protobuf.kotlin.lite)
+    // api, not implementation: LedgerDataStoreFactory exposes DataStore<SyncCursors>
+    // / DataStore<UserPrefs> to callers (core:data's Puller), so they need these
+    // types -- and SyncCursor/UserPrefs' own protobuf-lite supertypes -- on their
+    // own compile classpath, not just core:datastore's.
+    api(libs.androidx.datastore.core)
+    api(libs.protobuf.kotlin.lite)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.security.crypto)
 

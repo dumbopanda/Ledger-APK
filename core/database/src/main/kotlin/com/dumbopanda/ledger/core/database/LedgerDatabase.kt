@@ -7,21 +7,28 @@ import com.dumbopanda.ledger.core.database.converter.EnumConverters
 import com.dumbopanda.ledger.core.database.converter.InstantConverter
 import com.dumbopanda.ledger.core.database.converter.LocalDateConverter
 import com.dumbopanda.ledger.core.database.dao.AccountDao
+import com.dumbopanda.ledger.core.database.dao.DeadLetterDao
 import com.dumbopanda.ledger.core.database.dao.EntryDao
+import com.dumbopanda.ledger.core.database.dao.PendingOpDao
+import com.dumbopanda.ledger.core.database.entity.DeadLetterEntity
+import com.dumbopanda.ledger.core.database.entity.PendingOpEntity
 
-// Schema v1: entries + accounts only. pending_ops / dead_letter (§6.4's module
-// listing) land in a v2 migration at B1, once the op log actually exists — no
-// point exporting a schema for a table nothing writes to yet.
+// Schema v2: adds pending_ops + dead_letter (§5.1, §5.3) at B1, once the op
+// log actually exists.
 @Database(
     entities = [
         com.dumbopanda.ledger.core.database.entity.EntryEntity::class,
         com.dumbopanda.ledger.core.database.entity.AccountEntity::class,
+        PendingOpEntity::class,
+        DeadLetterEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(InstantConverter::class, LocalDateConverter::class, EnumConverters::class)
 abstract class LedgerDatabase : RoomDatabase() {
     abstract fun entryDao(): EntryDao
     abstract fun accountDao(): AccountDao
+    abstract fun pendingOpDao(): PendingOpDao
+    abstract fun deadLetterDao(): DeadLetterDao
 }

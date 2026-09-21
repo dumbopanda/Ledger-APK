@@ -5,6 +5,7 @@ import androidx.room.Query
 import androidx.room.Upsert
 import com.dumbopanda.ledger.core.database.entity.AccountEntity
 import kotlinx.coroutines.flow.Flow
+import java.time.Instant
 
 @Dao
 interface AccountDao {
@@ -28,4 +29,8 @@ interface AccountDao {
 
     @Query("""SELECT * FROM accounts WHERE clientUid = :clientUid""")
     suspend fun findByClientUid(clientUid: String): AccountEntity?
+
+    // Same reasoning as EntryDao.reconcileServerId.
+    @Query("""UPDATE accounts SET id = :serverId, updatedAt = :updatedAt WHERE clientUid = :clientUid""")
+    suspend fun reconcileServerId(clientUid: String, serverId: String, updatedAt: Instant)
 }

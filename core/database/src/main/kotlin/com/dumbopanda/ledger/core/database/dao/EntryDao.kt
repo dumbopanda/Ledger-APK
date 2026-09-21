@@ -5,6 +5,7 @@ import androidx.room.Query
 import androidx.room.Upsert
 import com.dumbopanda.ledger.core.database.entity.EntryEntity
 import kotlinx.coroutines.flow.Flow
+import java.time.Instant
 import java.time.LocalDate
 
 @Dao
@@ -45,4 +46,11 @@ interface EntryDao {
 
     @Query("""SELECT * FROM entries WHERE clientUid = :clientUid""")
     suspend fun findByClientUid(clientUid: String): EntryEntity?
+
+    // After a successful push (§5.3 step 3): the server assigns its own id
+    // (push_entries never accepts a client-supplied one), so the local row
+    // -- created with a locally-generated id -- must adopt it. Otherwise the
+    // next pull upserts a second, server-id-keyed copy of the same row.
+    @Query("""UPDATE entries SET id = :serverId, updatedAt = :updatedAt WHERE clientUid = :clientUid""")
+    suspend fun reconcileServerId(clientUid: String, serverId: String, updatedAt: Instant)
 }

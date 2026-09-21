@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- §8 — the whole permission list, every entry justified. Notably
          absent: POST_NOTIFICATIONS and USE_BIOMETRIC, both runtime-only
@@ -27,6 +28,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- WorkManager is configured manually in LedgerApplication (via
+             Configuration.Provider + HiltWorkerFactory) so @HiltWorker
+             classes like SyncWorker can be constructed; its default
+             androidx.startup auto-init would build workers with no DI. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 
 </manifest>
