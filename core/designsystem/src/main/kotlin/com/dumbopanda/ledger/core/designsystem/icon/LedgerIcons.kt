@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 
 object LedgerIcons {
@@ -14,5 +15,6 @@ object LedgerIcons {
     val Close = Icons.Filled.Close
     val Confirm = Icons.Filled.Check
     val Delete = Icons.Filled.Delete
+    val Regenerate = Icons.Filled.Refresh
     val Settings = Icons.Filled.Settings
 }
