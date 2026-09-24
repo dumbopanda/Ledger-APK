@@ -17,8 +17,11 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(libs.androidx.room.paging)
+    implementation(libs.androidx.paging.common)
 
     testImplementation(libs.junit)
+    testImplementation(libs.androidx.paging.testing)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.ext.junit)

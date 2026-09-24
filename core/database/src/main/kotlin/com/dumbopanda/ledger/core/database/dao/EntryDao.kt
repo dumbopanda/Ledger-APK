@@ -1,5 +1,6 @@
 package com.dumbopanda.ledger.core.database.dao
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
@@ -21,6 +22,14 @@ interface EntryDao {
            ORDER BY entryDate DESC, createdAt DESC LIMIT :limit OFFSET :offset""",
     )
     fun pageByDate(limit: Int, offset: Int): Flow<List<EntryEntity>>
+
+    // §7.7's History list, as a Paging3 source (C1) -- same order as [pageByDate], Room
+    // generates the LIMIT/OFFSET windowing itself from this signature.
+    @Query(
+        """SELECT * FROM entries WHERE deletedAt IS NULL
+           ORDER BY entryDate DESC, createdAt DESC""",
+    )
+    fun pagingSource(): PagingSource<Int, EntryEntity>
 
     // The prototype's odd-count-live rule (§2), moved off the main thread and made reactive.
     @Query(

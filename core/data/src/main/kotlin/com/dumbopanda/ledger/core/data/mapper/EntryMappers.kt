@@ -2,7 +2,11 @@ package com.dumbopanda.ledger.core.data.mapper
 
 import com.dumbopanda.ledger.core.database.converter.EnumConverters
 import com.dumbopanda.ledger.core.database.entity.EntryEntity
+import com.dumbopanda.ledger.core.model.Entry
+import com.dumbopanda.ledger.core.model.Money
+import com.dumbopanda.ledger.core.model.TxnId
 import com.dumbopanda.ledger.core.network.dto.EntryDto
+import com.dumbopanda.ledger.core.network.sync.EntryPushRow
 import java.time.Instant
 import java.time.LocalDate
 
@@ -28,4 +32,58 @@ fun EntryDto.toEntity(): EntryEntity = EntryEntity(
     createdAt = Instant.parse(createdAt),
     updatedAt = Instant.parse(updatedAt),
     deletedAt = deletedAt?.let(Instant::parse),
+)
+
+// A freshly created local row: not yet pushed, so `updatedAt` is just its own
+// creation time and `deletedAt` is always null -- there is no other valid
+// state for a row that has never left this device.
+fun Entry.toEntity(): EntryEntity = EntryEntity(
+    id = id,
+    clientUid = clientUid,
+    entryDate = entryDate,
+    txnId = txnId.value,
+    accountId = accountId,
+    expenseName = expenseName,
+    moreInfo = moreInfo,
+    txnType = txnType,
+    txnFreq = txnFreq,
+    amountMinor = amount.minor,
+    direction = direction,
+    transferGroup = transferGroup,
+    createdAt = createdAt,
+    updatedAt = createdAt,
+    deletedAt = null,
+)
+
+fun EntryEntity.toDomain(): Entry = Entry(
+    id = id,
+    clientUid = clientUid,
+    entryDate = entryDate,
+    txnId = TxnId(txnId),
+    accountId = accountId,
+    expenseName = expenseName,
+    moreInfo = moreInfo,
+    txnType = txnType,
+    txnFreq = txnFreq,
+    amount = Money(amountMinor),
+    direction = direction,
+    transferGroup = transferGroup,
+    createdAt = createdAt,
+)
+
+// The wire shape (§5.1) -- also what `pending_ops.payload_json` stores, so this is
+// called once, at enqueue time, never re-derived from the entity on every push.
+fun EntryEntity.toPushRow(): EntryPushRow = EntryPushRow(
+    clientUid = clientUid,
+    entryDate = entryDate.toString(),
+    txnId = txnId,
+    accountId = accountId,
+    expenseName = expenseName,
+    moreInfo = moreInfo,
+    txnType = txnType,
+    txnFreq = enumConverters.fromFrequency(txnFreq),
+    amountMinor = amountMinor,
+    direction = enumConverters.fromDirection(direction),
+    transferGroup = transferGroup,
+    deletedAt = deletedAt?.toString(),
 )
