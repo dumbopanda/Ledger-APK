@@ -16,8 +16,19 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                 defaultConfig.targetSdk = 36
 
                 buildTypes {
+                    // §11.2: "R8 full mode on; mapping.txt uploaded to Sentry on every
+                    // release or crash reports are unreadable." Full mode is AGP's own
+                    // default once minification is on (no gradle.properties override in
+                    // this project turns it off) -- shrinkResources rides along with it
+                    // since an unshrunk resource table is the other half of "the APK
+                    // still ships everything debug builds do."
                     release {
-                        isMinifyEnabled = false
+                        isMinifyEnabled = true
+                        isShrinkResources = true
+                        proguardFiles(
+                            getDefaultProguardFile("proguard-android-optimize.txt"),
+                            "proguard-rules.pro",
+                        )
                     }
                 }
             }
