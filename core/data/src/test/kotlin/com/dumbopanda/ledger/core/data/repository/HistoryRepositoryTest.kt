@@ -7,6 +7,7 @@ import com.dumbopanda.ledger.core.database.LedgerDatabase
 import com.dumbopanda.ledger.core.database.entity.EntryEntity
 import com.dumbopanda.ledger.core.model.TxnDirection
 import com.dumbopanda.ledger.core.model.TxnFrequency
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -33,11 +34,11 @@ class HistoryRepositoryTest {
     @After
     fun tearDown() = db.close()
 
-    private fun entity(id: String, date: LocalDate, deletedAt: Instant? = null) = EntryEntity(
+    private fun entity(id: String, date: LocalDate, deletedAt: Instant? = null, txnId: String = "Nabc123") = EntryEntity(
         id = id,
         clientUid = "client-$id",
         entryDate = date,
-        txnId = "Nabc123",
+        txnId = txnId,
         accountId = "account-1",
         expenseName = "Entry $id",
         moreInfo = null,
@@ -86,5 +87,18 @@ class HistoryRepositoryTest {
     fun `an empty history is an empty snapshot, not an error`() = runTest {
         val snapshot = pagedEntries { db }.asSnapshot()
         assertEquals(emptyList<String>(), snapshot.map { it.id })
+    }
+
+    @Test
+    fun `owedToMeEntries returns only live Y-prefixed entries`() = runTest {
+        db.entryDao().upsert(entity("01", LocalDate.of(2026, 9, 20), txnId = "Yabc123"))
+        db.entryDao().upsert(entity("02", LocalDate.of(2026, 9, 21), txnId = "Nabc123")) // not a Y entry
+        db.entryDao().upsert(
+            entity("03", LocalDate.of(2026, 9, 22), txnId = "Ydef456", deletedAt = Instant.parse("2026-09-22T01:00:00Z")),
+        )
+
+        val result = owedToMeEntries { db }.first()
+
+        assertEquals(listOf("01"), result.map { it.id })
     }
 }

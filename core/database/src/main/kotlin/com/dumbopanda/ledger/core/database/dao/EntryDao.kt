@@ -38,6 +38,14 @@ interface EntryDao {
     )
     fun openYIds(): Flow<List<String>>
 
+    // `ui-spec.md`'s Owed to me (History > Owed to me, changed 24-25 Sep 2026): every LIVE
+    // leg of every Y-id ever seen, open or closed -- not just the currently-open ones
+    // `openYIds()` returns. `GroupOwedToMeUseCase` (core:domain) folds this into one
+    // open-or-closed row per id; grouping happens there, not in SQL, same split as
+    // `pagingSource()` + `GroupEntriesByDayUseCase`.
+    @Query("""SELECT * FROM entries WHERE deletedAt IS NULL AND txnId LIKE 'Y%'""")
+    fun liveYEntries(): Flow<List<EntryEntity>>
+
     @Query("""SELECT * FROM entries WHERE transferGroup = :group AND deletedAt IS NULL""")
     suspend fun transferLegs(group: String): List<EntryEntity>
 

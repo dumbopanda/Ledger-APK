@@ -1,7 +1,6 @@
 package com.dumbopanda.ledger.core.domain
 
 import com.dumbopanda.ledger.core.model.TxnDirection
-import com.dumbopanda.ledger.core.model.TxnFrequency
 import com.dumbopanda.ledger.core.model.TxnId
 import java.time.LocalDate
 
@@ -12,6 +11,12 @@ import java.time.LocalDate
  * always both populated, even outside transfer mode: the To-account row is "always present in
  * the tree, never added or removed" (§7.5.4), so there's nothing to invent when the user
  * switches self-transfer on.
+ *
+ * No `frequency` field. `ui-spec.md`'s field list dropped it from the form entirely (settled
+ * 21 Sep 2026) -- [com.dumbopanda.ledger.core.model.Entry.txnFreq] still exists underneath
+ * because the server column does, but every draft writes it as `Monthly` unconditionally at
+ * the point it becomes an `Entry`, never asks the user, and nothing here needs to carry a
+ * value nobody sets.
  */
 data class EntryDraft(
     val resolvedDate: LocalDate?,
@@ -24,7 +29,6 @@ data class EntryDraft(
     val txnType: String,
     val sentLegType: String,
     val receivedLegType: String,
-    val frequency: TxnFrequency,
     val amount: AmountFieldValue,
     val direction: TxnDirection,
     // null in add mode; in edit mode, whether the entry being edited was ORIGINALLY a

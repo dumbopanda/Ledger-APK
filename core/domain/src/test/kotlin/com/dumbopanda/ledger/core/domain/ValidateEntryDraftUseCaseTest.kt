@@ -1,7 +1,6 @@
 package com.dumbopanda.ledger.core.domain
 
 import com.dumbopanda.ledger.core.model.TxnDirection
-import com.dumbopanda.ledger.core.model.TxnFrequency
 import com.dumbopanda.ledger.core.model.TxnId
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -30,7 +29,6 @@ class ValidateEntryDraftUseCaseTest {
         txnType = "Payment",
         sentLegType = "",
         receivedLegType = "",
-        frequency = TxnFrequency.OneOff,
         amount = amount,
         direction = TxnDirection.Debit,
         editModeOriginalIsTransfer = editModeOriginalIsTransfer,

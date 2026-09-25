@@ -2,7 +2,6 @@ package com.dumbopanda.ledger.core.domain
 
 import com.dumbopanda.ledger.core.model.Account
 import com.dumbopanda.ledger.core.model.TxnDirection
-import com.dumbopanda.ledger.core.model.TxnFrequency
 import com.dumbopanda.ledger.core.model.TxnId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -25,7 +24,6 @@ class ApplySelfTransferToggleUseCaseTest {
         accountId: String = domestic.id,
         toAccountId: String = international.id,
         txnId: TxnId = TxnId("Nabc123"),
-        frequency: TxnFrequency = TxnFrequency.OneOff,
         direction: TxnDirection = TxnDirection.Debit,
     ) = EntryDraft(
         resolvedDate = LocalDate.of(2026, 9, 24),
@@ -38,7 +36,6 @@ class ApplySelfTransferToggleUseCaseTest {
         txnType = "Payment",
         sentLegType = "",
         receivedLegType = "",
-        frequency = frequency,
         amount = AmountFieldValue("500", 3),
         direction = direction,
         editModeOriginalIsTransfer = null,
@@ -63,12 +60,6 @@ class ApplySelfTransferToggleUseCaseTest {
     fun `turning on auto-fills the expense name regardless of what was there`() {
         val result = useCase.apply(draft(expenseName = "Groceries"), turningOn = true, accounts, Random(1))
         assertEquals("Self Transfer", result.expenseName)
-    }
-
-    @Test
-    fun `turning on forces frequency to Monthly even if it was One Off`() {
-        val result = useCase.apply(draft(frequency = TxnFrequency.OneOff), turningOn = true, accounts, Random(1))
-        assertEquals(TxnFrequency.Monthly, result.frequency)
     }
 
     @Test
@@ -151,12 +142,6 @@ class ApplySelfTransferToggleUseCaseTest {
     fun `turning off resets direction to Debit even if it was Credit`() {
         val result = useCase.apply(draft(direction = TxnDirection.Credit), turningOn = false, accounts, Random(1))
         assertEquals(TxnDirection.Debit, result.direction)
-    }
-
-    @Test
-    fun `turning off still leaves frequency at Monthly`() {
-        val result = useCase.apply(draft(frequency = TxnFrequency.Monthly), turningOn = false, accounts, Random(1))
-        assertEquals(TxnFrequency.Monthly, result.frequency)
     }
 
     @Test

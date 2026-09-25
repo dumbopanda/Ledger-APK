@@ -2,7 +2,6 @@ package com.dumbopanda.ledger.core.domain
 
 import com.dumbopanda.ledger.core.model.Account
 import com.dumbopanda.ledger.core.model.TxnDirection
-import com.dumbopanda.ledger.core.model.TxnFrequency
 import javax.inject.Inject
 import kotlin.random.Random
 
@@ -41,7 +40,6 @@ class ApplySelfTransferToggleUseCase @Inject constructor(
             selfTransfer = true,
             txnId = newTxnId,
             expenseName = SELF_TRANSFER_NAME,
-            frequency = TxnFrequency.Monthly,
             sentLegType = "Sent Transfer",
             receivedLegType = "Received Transfer",
             toAccountId = newToAccountId,
@@ -59,7 +57,6 @@ class ApplySelfTransferToggleUseCase @Inject constructor(
             txnId = newTxnId,
             direction = TxnDirection.Debit,
             expenseName = newExpenseName,
-            frequency = TxnFrequency.Monthly,
         )
     }
 }
