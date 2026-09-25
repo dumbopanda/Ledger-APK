@@ -8,7 +8,9 @@ import com.dumbopanda.ledger.core.data.mapper.toDomain
 import com.dumbopanda.ledger.core.database.LedgerDatabase
 import com.dumbopanda.ledger.core.model.Entry
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import java.time.YearMonth
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,6 +28,12 @@ class HistoryRepository @Inject constructor(
     // Grouping into open/closed rows is the caller's job (`GroupOwedToMeUseCase`), same split
     // as `pagedEntries()` leaves day-grouping to the caller.
     fun owedToMeEntries(): Flow<List<Entry>> = owedToMeEntries { sessionDatabaseHolder.database() }
+
+    // §7.7's month summary card -- out, in (minor units), transfers excluded. Returns the raw
+    // pair rather than core:domain's `MonthSummary` -- core:data doesn't depend on core:domain
+    // (§6.5/§6.6's layering), so the wrap into that type is the caller's (ViewModel's) job,
+    // same split as `pagedEntries()` leaving day-grouping to `GroupEntriesByDayUseCase`.
+    fun monthOutIn(month: YearMonth): Flow<Pair<Long, Long>> = monthOutIn(month) { sessionDatabaseHolder.database() }
 }
 
 // Top-level so tests can supply a fixed in-memory database directly, same reasoning as
@@ -41,3 +49,10 @@ internal fun pagedEntries(databaseProvider: () -> LedgerDatabase): Flow<PagingDa
 
 internal fun owedToMeEntries(databaseProvider: () -> LedgerDatabase): Flow<List<Entry>> =
     databaseProvider().entryDao().liveYEntries().map { entities -> entities.map { it.toDomain() } }
+
+internal fun monthOutIn(month: YearMonth, databaseProvider: () -> LedgerDatabase): Flow<Pair<Long, Long>> {
+    val dao = databaseProvider().entryDao()
+    val from = month.atDay(1)
+    val to = month.atEndOfMonth()
+    return combine(dao.outMinorBetween(from, to), dao.inMinorBetween(from, to)) { out, income -> out to income }
+}

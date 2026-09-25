@@ -3,21 +3,27 @@ package com.dumbopanda.ledger
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import com.dumbopanda.ledger.core.designsystem.LedgerTheme
+import com.dumbopanda.ledger.core.designsystem.component.LedgerSegmentedButton
 import com.dumbopanda.ledger.feature.auth.SignInRoute
 import com.dumbopanda.ledger.feature.entry.EntryRoute
+import com.dumbopanda.ledger.feature.history.HistoryRoute
 import dagger.hilt.android.AndroidEntryPoint
 
 // Temporary entry point. Real boot routing (§7.1's six-row table) and the
 // three-tab nav (§7.0, Add Payment | History | Stats) are C9's job, once
 // Onboarding, Restoring and Home all actually exist to route between --
 // this just makes each screen reachable as it's built, same as A13 did
-// for sign-in alone. EntryRoute added once C1's screen assembly landed.
+// for sign-in alone. Stats has no screen yet (not in any C-block BUILD-LOG
+// names); the switch below covers the two tabs that do exist.
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,12 +36,28 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private enum class TempTab { ADD, HISTORY }
+
 @Composable
 private fun LedgerApp() {
     var signedIn by remember { mutableStateOf(false) }
+    var tab by remember { mutableStateOf(TempTab.ADD) }
 
     if (signedIn) {
-        EntryRoute()
+        Column(Modifier.fillMaxSize()) {
+            LedgerSegmentedButton(
+                options = listOf(TempTab.ADD, TempTab.HISTORY),
+                selected = tab,
+                onSelect = { tab = it },
+                label = { if (it == TempTab.ADD) "Add Payment" else "History" },
+            )
+            Column(Modifier.weight(1f)) {
+                when (tab) {
+                    TempTab.ADD -> EntryRoute()
+                    TempTab.HISTORY -> HistoryRoute()
+                }
+            }
+        }
     } else {
         SignInRoute(onSignedIn = { signedIn = true })
     }

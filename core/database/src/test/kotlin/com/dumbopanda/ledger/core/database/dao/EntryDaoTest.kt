@@ -154,4 +154,44 @@ class EntryDaoTest {
 
         assertEquals(20_000L - 5_000L, net)
     }
+
+    @Test
+    fun `outMinorBetween and inMinorBetween sum debit and credit separately, excluding transfers`() = runTest {
+        val from = LocalDate.of(2026, 9, 1)
+        val to = LocalDate.of(2026, 9, 30)
+        dao.upsert(entry(id = "expense", entryDate = from, amountMinor = 5_000, direction = TxnDirection.Debit))
+        dao.upsert(entry(id = "income", entryDate = from.plusDays(1), amountMinor = 20_000, direction = TxnDirection.Credit))
+        dao.upsert(
+            entry(
+                id = "transfer-out",
+                entryDate = from.plusDays(2),
+                amountMinor = 100_000,
+                direction = TxnDirection.Debit,
+                transferGroup = "group-1",
+            ),
+        )
+
+        assertEquals(5_000L, dao.outMinorBetween(from, to).first())
+        assertEquals(20_000L, dao.inMinorBetween(from, to).first())
+    }
+
+    @Test
+    fun `outMinorBetween is zero, not null, with no matching rows`() = runTest {
+        val from = LocalDate.of(2026, 9, 1)
+        val to = LocalDate.of(2026, 9, 30)
+        assertEquals(0L, dao.outMinorBetween(from, to).first())
+        assertEquals(0L, dao.inMinorBetween(from, to).first())
+    }
+
+    @Test
+    fun `softDelete sets deletedAt without removing the row`() = runTest {
+        dao.upsert(entry(id = "1", entryDate = LocalDate.of(2026, 9, 24)))
+        val deletedAt = Instant.parse("2026-09-24T12:00:00Z")
+
+        dao.softDelete("1", deletedAt)
+
+        val row = dao.findById("1")
+        assertEquals(deletedAt, row?.deletedAt)
+        assertEquals(deletedAt, row?.updatedAt)
+    }
 }

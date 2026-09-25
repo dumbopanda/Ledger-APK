@@ -2,8 +2,10 @@ package com.dumbopanda.ledger.core.data.repository
 
 import androidx.room.withTransaction
 import com.dumbopanda.ledger.core.common.LedgerClock
+import com.dumbopanda.ledger.core.data.mapper.toDomain
 import com.dumbopanda.ledger.core.data.mapper.toEntity
 import com.dumbopanda.ledger.core.data.mapper.toPushRow
+import com.dumbopanda.ledger.core.data.sync.EnqueueOutcome
 import com.dumbopanda.ledger.core.data.sync.Op
 import com.dumbopanda.ledger.core.data.sync.OpLog
 import com.dumbopanda.ledger.core.database.LedgerDatabase
@@ -20,6 +22,11 @@ private const val ENTRY = "entry"
  * without a pending op, since that op is the only thing that will ever push it to the server.
  * A transfer's two legs share that same transaction, so a crash between them can't leave a
  * half-written transfer (one leg with no sibling) sitting in the local database.
+ *
+ * §7.11's `deleteEntry` (C5): soft-deletes (never hard-deletes a synced row -- the tombstone
+ * IS the delete, per §5.2), cascades to every leg sharing a `transferGroup`, and hard-deletes
+ * instead only when [OpLog] reports the row was never synced in the first place
+ * ([EnqueueOutcome.CANCELLED] -- insert+delete, nothing to keep a tombstone for).
  */
 @Singleton
 class EntryRepository @Inject constructor(
@@ -30,6 +37,14 @@ class EntryRepository @Inject constructor(
 
     suspend fun addTransfer(sent: Entry, received: Entry) =
         writeTransfer(sessionDatabaseHolder.database(), clock, sent, received)
+
+    suspend fun deleteEntry(id: String) = deleteEntry(sessionDatabaseHolder.database(), clock, id)
+
+    // §7.10's From/To account display for a transfer leg -- a one-off lookup, not reactive
+    // (unlike owedToMeEntries, the detail sheet doesn't need every transfer group live, only
+    // the one currently open).
+    suspend fun transferLegs(group: String): List<Entry> =
+        sessionDatabaseHolder.database().entryDao().transferLegs(group).map { it.toDomain() }
 }
 
 // Top-level, not a method on EntryRepository, so tests can drive the actual transactional
@@ -57,4 +72,23 @@ private suspend fun enqueueInsert(db: LedgerDatabase, clock: LedgerClock, entry:
     OpLog(db.pendingOpDao(), clock).enqueue(
         Op.Insert(ENTRY, entity.clientUid, Json.encodeToString(entity.toPushRow())),
     )
+}
+
+internal suspend fun deleteEntry(db: LedgerDatabase, clock: LedgerClock, id: String) {
+    db.withTransaction {
+        val entity = db.entryDao().findById(id) ?: return@withTransaction
+        val legs = entity.transferGroup?.let { db.entryDao().transferLegs(it) } ?: listOf(entity)
+        val deletedAt = clock.now()
+        val opLog = OpLog(db.pendingOpDao(), clock)
+        for (leg in legs) {
+            val payload = Json.encodeToString(leg.copy(deletedAt = deletedAt).toPushRow())
+            val outcome = opLog.enqueue(Op.Delete(ENTRY, leg.clientUid, payload))
+            when (outcome) {
+                // Never synced -- nothing to keep a tombstone for, same as §5.2's
+                // insert+delete rule for the entity table, not just the op log.
+                EnqueueOutcome.CANCELLED -> db.entryDao().deleteByClientUid(leg.clientUid)
+                EnqueueOutcome.QUEUED -> db.entryDao().softDelete(leg.id, deletedAt)
+            }
+        }
+    }
 }

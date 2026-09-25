@@ -129,4 +129,50 @@ class EntryRepositoryTest {
             runTest { writeTransfer(db, clock, sent, received) }
         }
     }
+
+    // §7.11 / C5 -----------------------------------------------------------------------------
+
+    @Test
+    fun `deleting an already-synced entry soft-deletes it and enqueues a delete op`() = runTest {
+        writeEntry(db, clock, entry(id = "local-1"))
+        db.pendingOpDao().page(10).forEach { db.pendingOpDao().deleteBySeq(it.seq) } // simulate: already pushed
+
+        deleteEntry(db, clock, "local-1")
+
+        val row = db.entryDao().findById("local-1")
+        assertTrue(row != null && row.deletedAt != null)
+        val pending = db.pendingOpDao().page(10)
+        assertEquals(1, pending.size)
+        assertEquals("delete", pending.single().op)
+    }
+
+    @Test
+    fun `deleting a never-synced entry hard-deletes it and leaves no pending op`() = runTest {
+        writeEntry(db, clock, entry(id = "local-1")) // still has its insert op queued
+
+        deleteEntry(db, clock, "local-1")
+
+        assertEquals(null, db.entryDao().findById("local-1"))
+        assertTrue(db.pendingOpDao().page(10).isEmpty())
+    }
+
+    @Test
+    fun `deleting one leg of a transfer soft-deletes both`() = runTest {
+        val sent = entry(id = "local-1", clientUid = "client-sent", transferGroup = "group-1")
+        val received = entry(id = "local-2", clientUid = "client-received", transferGroup = "group-1")
+        writeTransfer(db, clock, sent, received)
+        db.pendingOpDao().page(10).forEach { db.pendingOpDao().deleteBySeq(it.seq) }
+
+        deleteEntry(db, clock, "local-1")
+
+        val legs = db.entryDao().transferLegs("group-1")
+        assertTrue(legs.isEmpty()) // both soft-deleted, so the deletedAt-IS-NULL query finds none
+        assertEquals(2, db.pendingOpDao().page(10).size)
+    }
+
+    @Test
+    fun `deleting a non-existent id is a no-op, not a crash`() = runTest {
+        deleteEntry(db, clock, "does-not-exist")
+        assertTrue(db.pendingOpDao().page(10).isEmpty())
+    }
 }

@@ -90,6 +90,18 @@ class HistoryRepositoryTest {
     }
 
     @Test
+    fun `monthOutIn sums out and in for the month, excluding earlier and later months`() = runTest {
+        db.entryDao().upsert(entity("01", LocalDate.of(2026, 9, 5)).copy(amountMinor = 5_000, direction = TxnDirection.Debit))
+        db.entryDao().upsert(entity("02", LocalDate.of(2026, 9, 20)).copy(amountMinor = 20_000, direction = TxnDirection.Credit))
+        db.entryDao().upsert(entity("03", LocalDate.of(2026, 8, 31)).copy(amountMinor = 999_999, direction = TxnDirection.Debit))
+
+        val (out, income) = monthOutIn(java.time.YearMonth.of(2026, 9)) { db }.first()
+
+        assertEquals(5_000L, out)
+        assertEquals(20_000L, income)
+    }
+
+    @Test
     fun `owedToMeEntries returns only live Y-prefixed entries`() = runTest {
         db.entryDao().upsert(entity("01", LocalDate.of(2026, 9, 20), txnId = "Yabc123"))
         db.entryDao().upsert(entity("02", LocalDate.of(2026, 9, 21), txnId = "Nabc123")) // not a Y entry

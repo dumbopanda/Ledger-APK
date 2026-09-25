@@ -58,6 +58,21 @@ interface EntryDao {
     )
     fun netMinorBetween(from: LocalDate, to: LocalDate): Flow<Long?>
 
+    // §7.7's month summary card's other two tiles -- Out and In separately, same exclusion.
+    @Query(
+        """SELECT COALESCE(SUM(amountMinor), 0) FROM entries
+           WHERE deletedAt IS NULL AND transferGroup IS NULL AND direction = 'debit'
+           AND entryDate BETWEEN :from AND :to""",
+    )
+    fun outMinorBetween(from: LocalDate, to: LocalDate): Flow<Long>
+
+    @Query(
+        """SELECT COALESCE(SUM(amountMinor), 0) FROM entries
+           WHERE deletedAt IS NULL AND transferGroup IS NULL AND direction = 'credit'
+           AND entryDate BETWEEN :from AND :to""",
+    )
+    fun inMinorBetween(from: LocalDate, to: LocalDate): Flow<Long>
+
     @Query("""SELECT * FROM entries WHERE id = :id""")
     suspend fun findById(id: String): EntryEntity?
 
@@ -76,4 +91,9 @@ interface EntryDao {
     // path, which soft-deletes (sets deletedAt) instead.
     @Query("""DELETE FROM entries WHERE clientUid = :clientUid""")
     suspend fun deleteByClientUid(clientUid: String)
+
+    // §7.11's ordinary delete path (the entry already exists, possibly already synced):
+    // soft-delete, never a hard delete, so a synced row still has a tombstone to push.
+    @Query("""UPDATE entries SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id""")
+    suspend fun softDelete(id: String, deletedAt: Instant)
 }

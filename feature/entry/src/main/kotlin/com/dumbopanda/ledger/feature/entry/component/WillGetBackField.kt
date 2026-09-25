@@ -118,12 +118,7 @@ fun WillGetBackField(
     }
 }
 
-private fun formatMoney(amount: Money): String {
-    val rupees = amount.minor / 100
-    val paise = amount.minor % 100
-    val clean = if (paise == 0L) rupees.toString() else "$rupees.${paise.toString().padStart(2, '0')}"
-    return "₹" + FormatAmountUseCase().toDisplay(clean)
-}
+private fun formatMoney(amount: Money): String = "₹" + FormatAmountUseCase().toDisplay(amount.toCleanRupeeString())
 
 @Preview(fontScale = 1.0f)
 @Preview(fontScale = 2.0f)
