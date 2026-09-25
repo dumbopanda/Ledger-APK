@@ -29,6 +29,17 @@ class SessionDatabaseHolder @Inject constructor(
     @Synchronized
     fun database(): LedgerDatabase {
         val userId = sessionStore.read()?.userId ?: error("SessionDatabaseHolder.database() called with no active session")
+        return database(userId)
+    }
+
+    // internal, not private -- SessionDatabaseHolderTest (C10's "sign in as A, then B, then A"
+    // gate) drives the actual reopen/close decision directly with plain userIds, the same
+    // reasoning UserPrefsRepositoryMappingTest uses to exercise toDomain()/toProto() without a
+    // real DataStore file: SessionStore is EncryptedSharedPreferences and needs a real Android
+    // Keystore, which Robolectric doesn't provide, so a test can't drive this through
+    // sessionStore.read() the way production code does.
+    @Synchronized
+    internal fun database(userId: String): LedgerDatabase {
         opened?.let { if (openedForUserId == userId) return it }
         opened?.close()
         val db = factory.open(userId)

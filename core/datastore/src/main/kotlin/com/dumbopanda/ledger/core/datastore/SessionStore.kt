@@ -22,13 +22,19 @@ data class Session(
 class SessionStore @Inject constructor(
     @ApplicationContext context: Context,
 ) {
-    private val prefs = EncryptedSharedPreferences.create(
-        context,
-        "ledger_session",
-        MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-    )
+    // Lazy, not eager: deferring Keystore access to first actual use (rather than to
+    // construction) means a test can construct a throwaway SessionStore -- to satisfy a
+    // constructor parameter it never otherwise touches, e.g. SessionDatabaseHolderTest -- under
+    // Robolectric, which has no real Android Keystore, without that construction itself throwing.
+    private val prefs by lazy {
+        EncryptedSharedPreferences.create(
+            context,
+            "ledger_session",
+            MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
+    }
 
     fun read(): Session? {
         val userId = prefs.getString(KEY_USER_ID, null) ?: return null

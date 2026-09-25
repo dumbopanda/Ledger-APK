@@ -58,4 +58,39 @@ class LedgerDatabaseFactoryTest {
         context.deleteDatabase(LedgerDatabaseFactory.fileNameFor("user-a"))
         context.deleteDatabase(LedgerDatabaseFactory.fileNameFor("user-b"))
     }
+
+    // C10's own gate, at the file level: opening user B's database in between does not disturb
+    // user A's file -- reopening it afterwards reads back exactly what was written, not a
+    // fresh/wiped file. SessionDatabaseHolderTest (core:data) proves the same claim through the
+    // app's actual reopen-on-user-switch seam; this proves the lower-level guarantee it relies
+    // on -- a closed Room file genuinely persists to disk rather than being an in-memory
+    // artifact of the connection that wrote it.
+    @Test
+    fun `user A's data survives a visit to user B's database in between`() = runTest {
+        val dbA1 = factory.open("user-a")
+        dbA1.accountDao().upsert(
+            AccountEntity(
+                id = "acc-1",
+                clientUid = "client-1",
+                name = "Cash",
+                sortOrder = 0,
+                archivedAt = null,
+                createdAt = Instant.now(),
+                updatedAt = Instant.now(),
+                deletedAt = null,
+            ),
+        )
+        dbA1.close()
+
+        val dbB = factory.open("user-b")
+        dbB.close()
+
+        val dbA2 = factory.open("user-a")
+        val restored = dbA2.accountDao().findByClientUid("client-1")
+        dbA2.close()
+
+        assertEquals("Cash", restored?.name)
+        context.deleteDatabase(LedgerDatabaseFactory.fileNameFor("user-a"))
+        context.deleteDatabase(LedgerDatabaseFactory.fileNameFor("user-b"))
+    }
 }
