@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.dumbopanda.ledger.core.designsystem.LedgerTheme
 import com.dumbopanda.ledger.core.designsystem.component.LedgerSegmentedButton
+import com.dumbopanda.ledger.feature.accounts.AccountsRoute
 import com.dumbopanda.ledger.feature.auth.SignInRoute
 import com.dumbopanda.ledger.feature.entry.EntryRoute
 import com.dumbopanda.ledger.feature.history.HistoryRoute
@@ -23,7 +24,7 @@ import dagger.hilt.android.AndroidEntryPoint
 // Onboarding, Restoring and Home all actually exist to route between --
 // this just makes each screen reachable as it's built, same as A13 did
 // for sign-in alone. Stats has no screen yet (not in any C-block BUILD-LOG
-// names); the switch below covers the two tabs that do exist.
+// names); the switch below covers the three tabs that do exist so far.
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,7 +37,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class TempTab { ADD, HISTORY }
+private enum class TempTab { ADD, HISTORY, ACCOUNTS }
 
 @Composable
 private fun LedgerApp() {
@@ -46,15 +47,22 @@ private fun LedgerApp() {
     if (signedIn) {
         Column(Modifier.fillMaxSize()) {
             LedgerSegmentedButton(
-                options = listOf(TempTab.ADD, TempTab.HISTORY),
+                options = listOf(TempTab.ADD, TempTab.HISTORY, TempTab.ACCOUNTS),
                 selected = tab,
                 onSelect = { tab = it },
-                label = { if (it == TempTab.ADD) "Add Payment" else "History" },
+                label = {
+                    when (it) {
+                        TempTab.ADD -> "Add Payment"
+                        TempTab.HISTORY -> "History"
+                        TempTab.ACCOUNTS -> "Accounts"
+                    }
+                },
             )
             Column(Modifier.weight(1f)) {
                 when (tab) {
                     TempTab.ADD -> EntryRoute()
                     TempTab.HISTORY -> HistoryRoute(onEditRequested = { tab = TempTab.ADD })
+                    TempTab.ACCOUNTS -> AccountsRoute()
                 }
             }
         }

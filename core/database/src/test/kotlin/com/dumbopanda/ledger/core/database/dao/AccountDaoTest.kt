@@ -81,4 +81,48 @@ class AccountDaoTest {
 
         assertEquals("1", found?.id)
     }
+
+    // §7.12 / C6 -------------------------------------------------------------------------------
+
+    @Test
+    fun `countLive counts non-deleted rows only`() = runTest {
+        dao.upsert(account(id = "1", name = "Cash"))
+        dao.upsert(account(id = "2", name = "Old", deletedAt = Instant.now()))
+        assertEquals(1, dao.countLive())
+    }
+
+    @Test
+    fun `countByNameExcluding is case-insensitive and excludes the account itself`() = runTest {
+        dao.upsert(account(id = "1", name = "Cash"))
+
+        assertEquals(1, dao.countByNameExcluding("cash", excludingId = "other-id"))
+        assertEquals(0, dao.countByNameExcluding("cash", excludingId = "1"))
+        assertEquals(0, dao.countByNameExcluding("Wallet", excludingId = "other-id"))
+    }
+
+    @Test
+    fun `rename updates the name`() = runTest {
+        dao.upsert(account(id = "1", name = "Cash"))
+        dao.rename("1", "Wallet", Instant.parse("2026-09-25T00:00:00Z"))
+        assertEquals("Wallet", dao.findById("1")?.name)
+    }
+
+    @Test
+    fun `setArchived sets and clears archivedAt`() = runTest {
+        dao.upsert(account(id = "1", name = "Cash"))
+        val now = Instant.parse("2026-09-25T00:00:00Z")
+
+        dao.setArchived("1", now, now)
+        assertEquals(now, dao.findById("1")?.archivedAt)
+
+        dao.setArchived("1", null, now)
+        assertEquals(null, dao.findById("1")?.archivedAt)
+    }
+
+    @Test
+    fun `updateSortOrder moves an account`() = runTest {
+        dao.upsert(account(id = "1", name = "Cash", sortOrder = 0))
+        dao.updateSortOrder("1", 5, Instant.now())
+        assertEquals(5, dao.findById("1")?.sortOrder)
+    }
 }

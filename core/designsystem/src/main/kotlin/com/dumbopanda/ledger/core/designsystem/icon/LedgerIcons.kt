@@ -6,6 +6,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 
@@ -17,4 +19,7 @@ object LedgerIcons {
     val Delete = Icons.Filled.Delete
     val Regenerate = Icons.Filled.Refresh
     val Settings = Icons.Filled.Settings
+    // §7.12's reorder buttons (material-icons-core only -- no extended pack in this project).
+    val MoveUp = Icons.Filled.KeyboardArrowUp
+    val MoveDown = Icons.Filled.KeyboardArrowDown
 }

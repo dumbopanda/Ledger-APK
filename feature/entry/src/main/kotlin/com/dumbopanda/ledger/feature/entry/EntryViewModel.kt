@@ -100,6 +100,11 @@ class EntryViewModel @Inject constructor(
     val events: SharedFlow<String> = _events.asSharedFlow()
 
     init {
+        // §7.12/C6's first-run seeding -- called here too (not just from AccountsViewModel),
+        // since Add Payment is this app's default tab and "Add an account first" would
+        // otherwise be a dead end for anyone who never visits Accounts. ensureSeeded's own
+        // transaction is the guard against double-seeding if both ViewModels call it.
+        viewModelScope.launch { accountRepository.ensureSeeded() }
         viewModelScope.launch {
             combine(accounts, openItems, editRequestStore.request) { accs, items, edit -> Triple(accs, items, edit) }
                 .collect { (accs, items, edit) -> recompute(accs, items, edit) }
