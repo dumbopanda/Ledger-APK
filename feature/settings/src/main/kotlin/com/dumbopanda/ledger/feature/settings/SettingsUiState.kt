@@ -12,4 +12,8 @@ data class SettingsUiState(
     // §7.16: refused while pending ops exist, with an honest count.
     val showSignOutGuard: Boolean,
     val signingOut: Boolean,
+    val exporting: Boolean,
+    val importing: Boolean,
+    // §7.14's nightly nudge.
+    val showNightlyNudge: Boolean,
 )

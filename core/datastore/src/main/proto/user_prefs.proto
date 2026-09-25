@@ -22,4 +22,11 @@ message UserPrefs {
   // "Require biometric to open (default off)" -- default false needs no
   // inversion trick, unlike the field above.
   bool require_biometric_to_open = 3;
+  // §7.14's nightly nudge: "no backup since the last 22:00 cutoff." 0 (proto3's
+  // default) means "never backed up" -- indistinguishable from epoch, which is
+  // fine, since a real backup will never actually land at exactly epoch millis.
+  int64 last_backup_at_epoch_millis = 4;
+  // §7.14's nudge is snoozeable; this is when a snooze expires. Same 0-means-
+  // "not snoozed" reasoning as the field above.
+  int64 nudge_snoozed_until_epoch_millis = 5;
 }

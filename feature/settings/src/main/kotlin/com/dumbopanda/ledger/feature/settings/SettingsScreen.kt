@@ -1,5 +1,8 @@
 package com.dumbopanda.ledger.feature.settings
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,22 +29,30 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dumbopanda.ledger.core.data.sync.SyncMode
 import com.dumbopanda.ledger.core.designsystem.LedgerTheme
+import com.dumbopanda.ledger.core.designsystem.component.LedgerBanner
+import com.dumbopanda.ledger.core.designsystem.component.LedgerBannerTone
 import com.dumbopanda.ledger.core.designsystem.component.LedgerCard
 import com.dumbopanda.ledger.core.designsystem.component.LedgerPillButton
 import com.dumbopanda.ledger.core.designsystem.component.LedgerSegmentedButton
+import java.time.LocalDate
 
 /**
  * §7.13. **Not built here** (present as informational/disabled rows, not silently omitted):
- * Backup (Save/Restore) is C8's job -- no export/import exists yet. Delete account is C11's --
- * 7 steps and a public web page, neither of which exist. "Require biometric to open" persists
- * its toggle but enforces nothing yet -- the gate belongs in §7.1's Boot routing, C9's job,
- * which doesn't exist to gate. "Hide amounts in the app switcher" is the one security toggle
- * that's actually wired end to end -- MainActivity applies `FLAG_SECURE` from it.
+ * Delete account is C11's -- 7 steps and a public web page, neither of which exist. "Require
+ * biometric to open" persists its toggle but enforces nothing yet -- the gate belongs in
+ * §7.1's Boot routing, C9's job, which doesn't exist to gate. "Hide amounts in the app
+ * switcher" is the one security toggle that's actually wired end to end -- MainActivity
+ * applies `FLAG_SECURE` from it. Export/import (§7.14) are real, via SAF launchers owned by
+ * this Composable (the ViewModel only ever sees a [android.net.Uri], never the picker itself).
+ * The nightly nudge banner shows here rather than app-wide, since there's no shared shell yet
+ * to host a global banner (C9's job) -- see this Composable's own body for where it renders.
  */
 @Composable
 fun SettingsRoute(onAccountsRequested: () -> Unit = {}, onSignedOut: () -> Unit = {}, viewModel: SettingsViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     LaunchedEffect(viewModel) { viewModel.signedOut.collect { onSignedOut() } }
+    LaunchedEffect(viewModel) { viewModel.events.collect { message -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show() } }
     SettingsScreen(uiState = uiState, onAction = viewModel::onAction, onAccountsRequested = onAccountsRequested)
 }
 
@@ -49,9 +60,12 @@ fun SettingsRoute(onAccountsRequested: () -> Unit = {}, onSignedOut: () -> Unit 
 internal fun SettingsScreen(uiState: SettingsUiState, onAction: (SettingsAction) -> Unit, onAccountsRequested: () -> Unit) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            if (uiState.showNightlyNudge) {
+                item { NightlyNudgeBanner(onAction) }
+            }
             item { SyncSection(uiState, onAction) }
             item { AccountsSection(onAccountsRequested) }
-            item { BackupSection() }
+            item { BackupSection(uiState, onAction) }
             item { SecuritySection(uiState, onAction) }
             item { AboutSection() }
             item { AccountSection(uiState, onAction) }
@@ -60,6 +74,14 @@ internal fun SettingsScreen(uiState: SettingsUiState, onAction: (SettingsAction)
 
     if (uiState.showSignOutGuard) {
         SignOutGuardDialog(uiState.pendingOpCount, onAction)
+    }
+}
+
+@Composable
+private fun NightlyNudgeBanner(onAction: (SettingsAction) -> Unit) {
+    Column(Modifier.padding(bottom = 8.dp)) {
+        LedgerBanner(text = "No backup since last night. Save one below?", tone = LedgerBannerTone.Warning)
+        TextButton(onClick = { onAction(SettingsAction.NudgeSnoozed) }) { Text("Remind me later") }
     }
 }
 
@@ -118,17 +140,24 @@ private fun AccountsSection(onAccountsRequested: () -> Unit) {
 }
 
 @Composable
-private fun BackupSection() {
+private fun BackupSection(uiState: SettingsUiState, onAction: (SettingsAction) -> Unit) {
     SectionTitle("Backup")
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) onAction(SettingsAction.ExportRequested(uri))
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) onAction(SettingsAction.ImportRequested(uri))
+    }
     LedgerCard {
-        Text(
-            "Export and import aren't built yet.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = {}, enabled = false) { Text("Save a backup file") }
-            OutlinedButton(onClick = {}, enabled = false) { Text("Restore from a file") }
+        Row(Modifier.padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = { exportLauncher.launch("ledger-backup-${LocalDate.now()}.json") },
+                enabled = !uiState.exporting,
+            ) { Text(if (uiState.exporting) "Saving…" else "Save a backup file") }
+            OutlinedButton(
+                onClick = { importLauncher.launch(arrayOf("application/json")) },
+                enabled = !uiState.importing,
+            ) { Text(if (uiState.importing) "Importing…" else "Restore from a file") }
         }
     }
 }
@@ -234,6 +263,9 @@ private fun SettingsScreenPreview() {
                 signedInEmail = "user@example.com",
                 showSignOutGuard = false,
                 signingOut = false,
+                exporting = false,
+                importing = false,
+                showNightlyNudge = true,
             ),
             onAction = {},
             onAccountsRequested = {},

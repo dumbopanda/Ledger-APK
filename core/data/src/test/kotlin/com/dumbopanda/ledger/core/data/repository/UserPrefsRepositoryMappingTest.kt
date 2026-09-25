@@ -2,7 +2,9 @@ package com.dumbopanda.ledger.core.data.repository
 
 import com.dumbopanda.ledger.core.data.sync.SyncMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
+import java.time.Instant
 import com.dumbopanda.ledger.core.datastore.SyncMode as ProtoSyncMode
 
 class UserPrefsRepositoryMappingTest {
@@ -24,5 +26,16 @@ class UserPrefsRepositoryMappingTest {
         assertEquals(SyncMode.SMART, ProtoSyncMode.SYNC_MODE_SMART.toDomain())
         assertEquals(SyncMode.INSTANT, ProtoSyncMode.SYNC_MODE_INSTANT.toDomain())
         assertEquals(SyncMode.MANUAL, ProtoSyncMode.SYNC_MODE_MANUAL.toDomain())
+    }
+
+    @Test
+    fun `zero epoch millis means unset, not epoch itself`() {
+        assertNull(0L.toInstantOrNull())
+    }
+
+    @Test
+    fun `a non-zero epoch millis round-trips to the same Instant`() {
+        val instant = Instant.parse("2026-09-25T12:00:00Z")
+        assertEquals(instant, instant.toEpochMilli().toInstantOrNull())
     }
 }

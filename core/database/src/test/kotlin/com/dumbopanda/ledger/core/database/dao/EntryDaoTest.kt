@@ -194,4 +194,26 @@ class EntryDaoTest {
         assertEquals(deletedAt, row?.deletedAt)
         assertEquals(deletedAt, row?.updatedAt)
     }
+
+    @Test
+    fun `allLive excludes soft-deleted rows`() = runTest {
+        dao.upsert(entry(id = "1", entryDate = LocalDate.of(2026, 9, 24)))
+        dao.upsert(entry(id = "2", entryDate = LocalDate.of(2026, 9, 23)))
+        dao.softDelete("2", Instant.now())
+
+        val all = dao.allLive()
+
+        assertEquals(listOf("1"), all.map { it.id })
+    }
+
+    @Test
+    fun `hasAnyLiveEntries is false when empty or fully deleted, true once a live row exists`() = runTest {
+        assertEquals(false, dao.hasAnyLiveEntries().first())
+
+        dao.upsert(entry(id = "1", entryDate = LocalDate.of(2026, 9, 24)))
+        assertEquals(true, dao.hasAnyLiveEntries().first())
+
+        dao.softDelete("1", Instant.now())
+        assertEquals(false, dao.hasAnyLiveEntries().first())
+    }
 }

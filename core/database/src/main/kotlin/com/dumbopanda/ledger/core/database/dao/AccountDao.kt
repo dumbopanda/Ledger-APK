@@ -59,4 +59,9 @@ interface AccountDao {
 
     @Query("""UPDATE accounts SET sortOrder = :sortOrder, updatedAt = :updatedAt WHERE id = :id""")
     suspend fun updateSortOrder(id: String, sortOrder: Int, updatedAt: Instant)
+
+    // §7.14's export: every LIVE account (archived included -- an archived account is still
+    // part of "the ledger"), one-shot.
+    @Query("""SELECT * FROM accounts WHERE deletedAt IS NULL ORDER BY sortOrder, name COLLATE NOCASE""")
+    suspend fun allLive(): List<AccountEntity>
 }

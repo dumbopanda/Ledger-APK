@@ -125,4 +125,15 @@ class AccountDaoTest {
         dao.updateSortOrder("1", 5, Instant.now())
         assertEquals(5, dao.findById("1")?.sortOrder)
     }
+
+    @Test
+    fun `allLive includes archived but excludes deleted`() = runTest {
+        dao.upsert(account(id = "1", name = "Cash"))
+        dao.upsert(account(id = "2", name = "Old Wallet", archivedAt = Instant.now()))
+        dao.upsert(account(id = "3", name = "Gone", deletedAt = Instant.now()))
+
+        val all = dao.allLive()
+
+        assertEquals(setOf("Cash", "Old Wallet"), all.map { it.name }.toSet())
+    }
 }

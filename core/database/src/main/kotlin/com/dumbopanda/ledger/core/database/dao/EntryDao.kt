@@ -96,4 +96,15 @@ interface EntryDao {
     // soft-delete, never a hard delete, so a synced row still has a tombstone to push.
     @Query("""UPDATE entries SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id""")
     suspend fun softDelete(id: String, deletedAt: Instant)
+
+    // §7.14's export: every LIVE entry, one-shot (not reactive -- an export is a snapshot).
+    // Tombstoned rows are deliberately excluded -- "the ledger" is its current visible state,
+    // not a history of deletions; re-importing after an uninstall shouldn't resurrect them.
+    @Query("""SELECT * FROM entries WHERE deletedAt IS NULL ORDER BY entryDate, createdAt""")
+    suspend fun allLive(): List<EntryEntity>
+
+    // §7.14's nightly nudge: "if there are entries" -- reactive, cheaper than watching the
+    // full paged list just to know whether it's non-empty.
+    @Query("""SELECT EXISTS(SELECT 1 FROM entries WHERE deletedAt IS NULL)""")
+    fun hasAnyLiveEntries(): Flow<Boolean>
 }

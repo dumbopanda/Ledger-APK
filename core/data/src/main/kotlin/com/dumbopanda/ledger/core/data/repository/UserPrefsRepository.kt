@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 import com.dumbopanda.ledger.core.datastore.SyncMode as ProtoSyncMode
@@ -28,10 +29,14 @@ class UserPrefsRepository @Inject constructor(
     fun syncMode(): Flow<SyncMode> = prefs().map { it.syncMode.toDomain() }
     fun showAmountsInAppSwitcher(): Flow<Boolean> = prefs().map { it.showAmountsInAppSwitcher }
     fun requireBiometricToOpen(): Flow<Boolean> = prefs().map { it.requireBiometricToOpen }
+    fun lastBackupAt(): Flow<Instant?> = prefs().map { it.lastBackupAtEpochMillis.toInstantOrNull() }
+    fun nudgeSnoozedUntil(): Flow<Instant?> = prefs().map { it.nudgeSnoozedUntilEpochMillis.toInstantOrNull() }
 
     suspend fun setSyncMode(mode: SyncMode) = update { it.setSyncMode(mode.toProto()) }
     suspend fun setShowAmountsInAppSwitcher(show: Boolean) = update { it.setShowAmountsInAppSwitcher(show) }
     suspend fun setRequireBiometricToOpen(require: Boolean) = update { it.setRequireBiometricToOpen(require) }
+    suspend fun setLastBackupAt(at: Instant) = update { it.setLastBackupAtEpochMillis(at.toEpochMilli()) }
+    suspend fun setNudgeSnoozedUntil(until: Instant) = update { it.setNudgeSnoozedUntilEpochMillis(until.toEpochMilli()) }
 
     // For a write path that needs the CURRENT mode once (EntryRepository/AccountRepository,
     // deciding how to notify SyncScheduler right after enqueueing an op) without holding a
@@ -62,3 +67,7 @@ internal fun SyncMode.toProto(): ProtoSyncMode = when (this) {
     SyncMode.INSTANT -> ProtoSyncMode.SYNC_MODE_INSTANT
     SyncMode.MANUAL -> ProtoSyncMode.SYNC_MODE_MANUAL
 }
+
+// 0 (proto3's own default) means "unset" for both epoch-millis fields -- see user_prefs.proto's
+// own comment for why that's safe (a real timestamp is never exactly epoch).
+internal fun Long.toInstantOrNull(): Instant? = if (this == 0L) null else Instant.ofEpochMilli(this)

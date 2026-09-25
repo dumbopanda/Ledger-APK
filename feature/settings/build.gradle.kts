@@ -19,6 +19,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.hilt.navigation.compose)
+    implementation(libs.androidx.activity.compose) // §7.14's SAF launchers (CreateDocument/OpenDocument)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
