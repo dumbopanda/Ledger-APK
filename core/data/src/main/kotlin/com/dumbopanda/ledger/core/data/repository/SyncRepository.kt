@@ -26,6 +26,32 @@ class SyncRepository @Inject constructor(
     private val authRepository: AuthRepository,
     private val clock: LedgerClock,
 ) {
+    /**
+     * §7.4 Restoring's full pull for a new device or reinstall -- pull only, deliberately no
+     * push: a database that just became newly reachable (empty local DB, per [BootRepository]'s
+     * own precondition for choosing this route) has nothing pending to push yet. [onProgress]
+     * is the running row count [com.dumbopanda.ledger.core.data.sync.Puller.pull] reports,
+     * §7.4's "determinate progress from pull_entries page counts."
+     */
+    suspend fun restore(onProgress: (Int) -> Unit = {}): SyncOutcome {
+        val userId = sessionStore.read()?.userId ?: return SyncOutcome.UNAUTHORIZED
+        val db = ledgerDatabaseFactory.open(userId)
+        try {
+            val cursorStore = dataStoreFactory.syncCursors(userId)
+            val puller = Puller(db, cursorStore, syncApi, authRepository)
+            return when (puller.pull(onProgress)) {
+                PullOutcome.SESSION_EXPIRED -> SyncOutcome.UNAUTHORIZED
+                PullOutcome.RETRYABLE -> SyncOutcome.RETRYABLE
+                PullOutcome.SUCCESS -> SyncOutcome.SUCCESS
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "restore() failed unexpectedly", e)
+            return SyncOutcome.FATAL
+        } finally {
+            db.close()
+        }
+    }
+
     suspend fun sync(): SyncOutcome {
         val userId = sessionStore.read()?.userId ?: return SyncOutcome.UNAUTHORIZED
         val db = ledgerDatabaseFactory.open(userId)

@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,17 +28,24 @@ import com.dumbopanda.ledger.core.designsystem.component.LedgerPillButton
 @Composable
 fun SignInRoute(
     onSignedIn: () -> Unit,
+    sessionExpiredNote: Boolean = false,
     viewModel: SignInViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    if (uiState is SignInUiState.Success) {
-        onSignedIn()
+    // §7.1 row 2's boot-time refresh failure lands here with sessionExpiredNote = true; a
+    // fresh sign-in from Onboarding passes false. Was a direct call in the composable body
+    // before NavHost wiring existed (harmless when it only flipped a local boolean) -- now
+    // that onSignedIn navigates, an un-gated call on every recomposition of Success would
+    // push duplicate back-stack entries, so it's gated to fire once per Success transition.
+    LaunchedEffect(uiState) {
+        if (uiState is SignInUiState.Success) onSignedIn()
     }
 
     SignInScreen(
         uiState = uiState,
+        sessionExpiredNote = sessionExpiredNote,
         onContinueWithGoogle = { viewModel.signIn(context) },
         onOpenAddAccountSettings = {
             context.startActivity(Intent(Settings.ACTION_ADD_ACCOUNT))
@@ -50,6 +58,7 @@ internal fun SignInScreen(
     uiState: SignInUiState,
     onContinueWithGoogle: () -> Unit,
     onOpenAddAccountSettings: () -> Unit,
+    sessionExpiredNote: Boolean = false,
 ) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -57,6 +66,17 @@ internal fun SignInScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
+            // §7.15: "Signed out. Your entries are safe on this device." -- shown alongside
+            // Idle/InProgress only; a real error from THIS attempt (NetworkFailure,
+            // TokenRejected, ...) is more specific and takes the banner slot instead.
+            if (sessionExpiredNote && (uiState is SignInUiState.Idle || uiState is SignInUiState.InProgress)) {
+                LedgerBanner(
+                    text = "Signed out. Your entries are safe on this device.",
+                    tone = LedgerBannerTone.Warning,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
+            }
+
             when (uiState) {
                 is SignInUiState.NoGoogleAccountOnDevice -> {
                     LedgerBanner(

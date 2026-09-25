@@ -32,13 +32,18 @@ class Puller(
     private val syncApi: SyncApi,
     private val authRepository: AuthRepository,
 ) {
-    suspend fun pull(): PullOutcome {
-        val entriesOutcome = pullEntries()
+    // onProgress's own argument is a running total across BOTH entries and accounts pages, in
+    // that order -- §7.4's "determinate progress from pull_entries page counts," extended to
+    // cover accounts too since Restoring has no way to tell the user apart which table a count
+    // came from, and doesn't need to.
+    suspend fun pull(onProgress: (Int) -> Unit = {}): PullOutcome {
+        var pulledSoFar = 0
+        val entriesOutcome = pullEntries { pulledSoFar += it; onProgress(pulledSoFar) }
         if (entriesOutcome != PullOutcome.SUCCESS) return entriesOutcome
-        return pullAccounts()
+        return pullAccounts { pulledSoFar += it; onProgress(pulledSoFar) }
     }
 
-    private suspend fun pullEntries(): PullOutcome {
+    private suspend fun pullEntries(onPage: (Int) -> Unit): PullOutcome {
         var refreshAttempted = false
         while (true) {
             val cursor = cursorStore.data.first().entries
@@ -54,13 +59,14 @@ class Puller(
                 is SyncResult.Success -> {
                     val rows = result.value
                     if (rows.isNotEmpty()) applyEntryPage(rows)
+                    onPage(rows.size)
                     if (rows.size < PAGE_SIZE) return PullOutcome.SUCCESS
                 }
             }
         }
     }
 
-    private suspend fun pullAccounts(): PullOutcome {
+    private suspend fun pullAccounts(onPage: (Int) -> Unit): PullOutcome {
         var refreshAttempted = false
         while (true) {
             val cursor = cursorStore.data.first().accounts
@@ -76,6 +82,7 @@ class Puller(
                 is SyncResult.Success -> {
                     val rows = result.value
                     if (rows.isNotEmpty()) applyAccountPage(rows)
+                    onPage(rows.size)
                     if (rows.size < PAGE_SIZE) return PullOutcome.SUCCESS
                 }
             }

@@ -25,4 +25,12 @@ class LedgerDataStoreFactory @Inject constructor(
             serializer = UserPrefsSerializer,
             produceFile = { File(context.filesDir, "datastore/user_prefs-$userId.pb") },
         )
+
+    // Not per-user, unlike the two stores above -- see consent_state.proto's own doc for why:
+    // Onboarding's consent pane runs before there is a signed-in userId to key a file on. Same
+    // fresh-instance-per-call contract as syncCursors/userPrefs: short-lived, sequential use.
+    fun consentState(): DataStore<ConsentState> = DataStoreFactory.create(
+        serializer = ConsentStateSerializer,
+        produceFile = { File(context.filesDir, "datastore/consent_state.pb") },
+    )
 }

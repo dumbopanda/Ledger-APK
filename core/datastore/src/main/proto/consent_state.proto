@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option java_package = "com.dumbopanda.ledger.core.datastore";
+option java_multiple_files = true;
+
+// §7.2 pane 3 / §7.1 row 1 -- unlike UserPrefs and SyncCursors, this is
+// deliberately device-scoped, not per-user: Onboarding (and its consent
+// pane) runs BEFORE sign-in, when there is no userId yet to key a per-user
+// file on. Single file, one device, same reasoning as SessionStore's own
+// "one active session at a time" -- see LedgerDataStoreFactory.
+message ConsentState {
+  // 0 (proto3's own default) means "never accepted anything" -- see
+  // core:domain's CURRENT_CONSENT_VERSION doc for why versions start at 1,
+  // not 0, so that default is never mistaken for a real acceptance.
+  int32 consent_version_accepted = 1;
+  int64 consent_accepted_at_epoch_millis = 2;
+}

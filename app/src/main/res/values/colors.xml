@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CanvasLight, mirrored from core:designsystem's LedgerColors.kt: the splash theme
+         below is an XML/manifest-level concept Compose can't reach into, so this one value is
+         necessarily duplicated rather than shared. -->
+    <color name="splash_background">#F4F1EA</color>
+</resources>

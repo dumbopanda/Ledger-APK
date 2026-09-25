@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- §7.1: "Single decision point, no UI beyond the system splash." No splash-screen
+         library: androidx.core:core-splashscreen's own installSplashScreen() failed to link
+         against this project's Kotlin/AGP toolchain (Kotlin's newer Build Tools API compiler
+         path couldn't resolve members of that AAR's Kotlin-compiled classes, while pure-Java
+         AARs like androidx.biometric were unaffected), worth retrying against a future
+         toolchain update, flagged rather than fought further here. MainActivity instead holds
+         the launch window's own background (this theme, a plain color, no animated icon since
+         no launcher icon asset exists yet either) via the same ViewTreeObserver.OnPreDraw
+         technique the compat library used internally anyway; works identically on every API
+         level back to minSdk, at the cost of the library's exit animation, which this project
+         never asked for. -->
+    <style name="Theme.App.Starting" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
+</resources>
