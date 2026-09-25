@@ -6,6 +6,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.dumbopanda.ledger.core.common.LedgerClock
 import com.dumbopanda.ledger.core.data.repository.AccountRepository
+import com.dumbopanda.ledger.core.data.repository.EditRequestStore
 import com.dumbopanda.ledger.core.data.repository.EntryRepository
 import com.dumbopanda.ledger.core.data.repository.HistoryRepository
 import com.dumbopanda.ledger.core.domain.GroupOwedToMeUseCase
@@ -39,6 +40,7 @@ class HistoryViewModel @Inject constructor(
     private val historyRepository: HistoryRepository,
     private val accountRepository: AccountRepository,
     private val entryRepository: EntryRepository,
+    private val editRequestStore: EditRequestStore,
     private val groupOwedToMe: GroupOwedToMeUseCase,
     private val clock: LedgerClock,
 ) : ViewModel() {
@@ -92,7 +94,7 @@ class HistoryViewModel @Inject constructor(
             HistoryAction.DeleteTapped -> detail = detail?.copy(showDeleteConfirm = true)
             HistoryAction.DeleteCancelled -> detail = detail?.copy(showDeleteConfirm = false)
             HistoryAction.DeleteConfirmed -> confirmDelete()
-            HistoryAction.EditTapped -> Unit // C4
+            HistoryAction.EditTapped -> requestEdit()
         }
         publish(accounts.value, owedToMeItems.value, monthOutIn.value)
     }
@@ -145,6 +147,24 @@ class HistoryViewModel @Inject constructor(
         isTransferLeg = entry.transferGroup != null,
         openTxnId = if (owedItem != null && owedItem.isOpen) entry.txnId else null,
     )
+
+    // §7.6/C4: hands the currently-displayed leg (already whichever side the Open/Close
+    // toggle selects) to EntryViewModel via EditRequestStore. A transfer leg's sibling is
+    // resolved fresh here rather than reused from `resolveToAccount`'s result, since that one
+    // only kept the sibling's Account, not its full Entry.
+    private fun requestEdit() {
+        val entry = detail?.entry ?: return
+        val group = entry.transferGroup
+        detail = null // the sheet is done its job -- the form takes over from here
+        if (group == null) {
+            editRequestStore.request(entry, sibling = null)
+        } else {
+            viewModelScope.launch {
+                val sibling = entryRepository.transferLegs(group).find { it.id != entry.id }
+                editRequestStore.request(entry, sibling)
+            }
+        }
+    }
 
     private fun confirmDelete() {
         val current = detail ?: return

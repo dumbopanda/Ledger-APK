@@ -59,10 +59,20 @@ private fun signedRupees(minor: Long): String {
 }
 
 @Composable
-fun HistoryRoute(viewModel: HistoryViewModel = hiltViewModel()) {
+fun HistoryRoute(onEditRequested: () -> Unit = {}, viewModel: HistoryViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pagedEntries = viewModel.pagedEntries.collectAsLazyPagingItems()
-    HistoryScreen(uiState = uiState, pagedEntries = pagedEntries, onAction = viewModel::onAction)
+    HistoryScreen(
+        uiState = uiState,
+        pagedEntries = pagedEntries,
+        onAction = { action ->
+            viewModel.onAction(action)
+            // Handing the entry over happens via EditRequestStore (data layer); this callback
+            // is the UI-only "switch to the Add tab" concern MainActivity's temporary switch
+            // needs -- C9's real nav graph replaces both with one navigate() call.
+            if (action == HistoryAction.EditTapped) onEditRequested()
+        },
+    )
 }
 
 @Composable

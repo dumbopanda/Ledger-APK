@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dumbopanda.ledger.core.common.LedgerClock
 import com.dumbopanda.ledger.core.data.repository.AccountRepository
+import com.dumbopanda.ledger.core.data.repository.EditRequest
+import com.dumbopanda.ledger.core.data.repository.EditRequestStore
 import com.dumbopanda.ledger.core.data.repository.EntryRepository
 import com.dumbopanda.ledger.core.data.repository.HistoryRepository
 import com.dumbopanda.ledger.core.domain.AmountFieldValue
@@ -28,9 +30,12 @@ import com.dumbopanda.ledger.feature.entry.component.AccountSide
 import com.dumbopanda.ledger.feature.entry.component.TXN_TYPE_OPTIONS
 import com.dumbopanda.ledger.feature.entry.component.resolveAccountSwap
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -45,18 +50,21 @@ import javax.inject.Inject
 private val FULL_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
 /**
- * C1's remaining half: wires B9-B13's field components and the C1 data layer onto one real
- * screen (§7.5). Scope note, deliberate, matching BUILD-LOG.md's own C1/C4 split: ADD mode
- * only. Edit mode -- loading an existing entry's fields, the frozen-original/shape-lock rule,
- * the Open/Close leg toggle wired to Delete/Edit -- is C4's job, a separate block; the pieces
- * that already exist for it ([EntryDraft.editModeOriginalIsTransfer], `TxnIdChoice.editFallback`)
- * are there so C4 can wire in without another rework, not because this VM uses them yet.
+ * C1's screen assembly (§7.5) plus C4's edit mode (§7.6). Add and Edit are "the same form
+ * doing both jobs" per §7.6's own words -- [draft]/[save] don't branch on a mode flag, they
+ * branch on whether [editingOriginal] is set, which is exactly the "frozen at the moment
+ * editing starts" rows §7.6 calls for.
+ *
+ * Edit is entered via [EditRequestStore] -- observed reactively (not just once at init), since
+ * this ViewModel can outlive a single History->Edit round trip. See [EditRequestStore]'s own
+ * doc for why a singleton store exists at all instead of a navigation argument.
  */
 @HiltViewModel
 class EntryViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val historyRepository: HistoryRepository,
     private val entryRepository: EntryRepository,
+    private val editRequestStore: EditRequestStore,
     private val parseDateInput: ParseDateInputUseCase,
     private val applySelfTransferToggle: ApplySelfTransferToggleUseCase,
     private val validateEntryDraft: ValidateEntryDraftUseCase,
@@ -71,6 +79,7 @@ class EntryViewModel @Inject constructor(
     // The form's own state -- not derived from the reactive flows below, so a fresh accounts/
     // openItems emission (another device syncing in, say) never clobbers what's being typed.
     private var draft: EntryDraft? = null
+    private var editingOriginal: EditingOriginal? = null
     private var dateText: TextFieldValue = initialDateText()
     private var showConfirmSheet = false
     private var saving = false
@@ -85,14 +94,23 @@ class EntryViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<EntryUiState>(EntryUiState.Loading)
     val uiState: StateFlow<EntryUiState> = _uiState.asStateFlow()
 
+    // One-shot events (§7.6's "Edit cancelled — nothing changed" toast) -- not form state, so
+    // not part of EntryUiState, which the Route would otherwise re-show on every recomposition.
+    private val _events = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val events: SharedFlow<String> = _events.asSharedFlow()
+
     init {
         viewModelScope.launch {
-            combine(accounts, openItems) { accs, items -> accs to items }
-                .collect { (accs, items) -> recompute(accs, items) }
+            combine(accounts, openItems, editRequestStore.request) { accs, items, edit -> Triple(accs, items, edit) }
+                .collect { (accs, items, edit) -> recompute(accs, items, edit) }
         }
     }
 
     fun onAction(action: EntryAction) {
+        if (action == EntryAction.CancelEdit) {
+            cancelEdit()
+            return
+        }
         val current = draft ?: return
         draft = when (action) {
             is EntryAction.DateTextChanged -> {
@@ -126,6 +144,7 @@ class EntryViewModel @Inject constructor(
                 save(current)
                 current
             }
+            EntryAction.CancelEdit -> current // unreachable, handled above
         }
         publish()
     }
@@ -140,29 +159,50 @@ class EntryViewModel @Inject constructor(
         return draft.copy(accountId = newFrom.id, toAccountId = newTo.id)
     }
 
-    private fun recompute(accs: List<Account>, items: List<OwedToMeItem>) {
+    private fun recompute(accs: List<Account>, items: List<OwedToMeItem>, edit: EditRequest?) {
         if (accs.isEmpty()) {
             _uiState.value = EntryUiState.NoAccounts
             return
         }
-        if (draft == null) {
-            draft = EntryDraft(
-                resolvedDate = today(),
-                expenseName = "",
-                moreInfo = null,
-                selfTransfer = false,
-                accountId = accs.first().id,
-                toAccountId = accs.getOrElse(1) { accs.first() }.id,
-                txnId = generateTxnId.generate(isY = false),
-                txnType = TXN_TYPE_OPTIONS.first(),
-                sentLegType = "Sent Transfer",
-                receivedLegType = "Received Transfer",
-                amount = AmountFieldValue("", 0),
-                direction = TxnDirection.Debit,
-                editModeOriginalIsTransfer = null,
-            )
+        if (edit != null) {
+            // Tapping Edit always opens the edit form, discarding whatever was mid-typed in
+            // Add -- the whole screen just swapped jobs, same as §7.6 describes.
+            val result = buildEditDraft(edit.entry, edit.sibling, accs)
+            draft = result.draft
+            editingOriginal = result.original
+            dateText = dateTextFor(result.draft.resolvedDate)
+            showConfirmSheet = false
+            editRequestStore.consume()
+        } else if (draft == null) {
+            draft = buildAddDraft(accs)
         }
         publish()
+    }
+
+    private fun buildAddDraft(accs: List<Account>) = EntryDraft(
+        resolvedDate = today(),
+        expenseName = "",
+        moreInfo = null,
+        selfTransfer = false,
+        accountId = accs.first().id,
+        toAccountId = accs.getOrElse(1) { accs.first() }.id,
+        txnId = generateTxnId.generate(isY = false),
+        txnType = TXN_TYPE_OPTIONS.first(),
+        sentLegType = "Sent Transfer",
+        receivedLegType = "Received Transfer",
+        amount = AmountFieldValue("", 0),
+        direction = TxnDirection.Debit,
+        editModeOriginalIsTransfer = null,
+    )
+
+    private fun cancelEdit() {
+        if (editingOriginal == null) return // Cancel only means something mid-edit
+        draft = null
+        editingOriginal = null
+        showConfirmSheet = false
+        dateText = initialDateText()
+        recompute(accounts.value, openItems.value, edit = null)
+        _events.tryEmit("Edit cancelled — nothing changed")
     }
 
     private fun publish() {
@@ -186,21 +226,101 @@ class EntryViewModel @Inject constructor(
             showConfirmSheet = showConfirmSheet,
             confirmSentence = sentence,
             saving = saving,
+            isEditing = editingOriginal != null,
         )
     }
 
     private fun save(draft: EntryDraft) {
         val date = draft.resolvedDate ?: return
         val minor = parseMinorAmount(draft.amount.clean) ?: return
+        val original = editingOriginal
         saving = true
         publish()
         viewModelScope.launch {
-            val createdAt = clock.now()
-            if (draft.selfTransfer) {
-                val transferGroup = UUID.randomUUID().toString()
-                val sent = Entry(
+            if (original == null) {
+                saveNew(draft, date, minor)
+            } else {
+                saveEdit(draft, date, minor, original)
+            }
+            saving = false
+            this@EntryViewModel.draft = null
+            this@EntryViewModel.editingOriginal = null
+            dateText = initialDateText()
+            _uiState.value = EntryUiState.Saved
+        }
+    }
+
+    private suspend fun saveNew(draft: EntryDraft, date: LocalDate, minor: Long) {
+        val createdAt = clock.now()
+        if (draft.selfTransfer) {
+            val transferGroup = UUID.randomUUID().toString()
+            val sent = Entry(
+                id = UUID.randomUUID().toString(),
+                clientUid = UUID.randomUUID().toString(),
+                entryDate = date,
+                txnId = draft.txnId,
+                accountId = draft.accountId,
+                expenseName = draft.expenseName,
+                moreInfo = draft.moreInfo,
+                txnType = draft.sentLegType,
+                txnFreq = TxnFrequency.Monthly,
+                amount = Money(minor),
+                direction = TxnDirection.Debit,
+                transferGroup = transferGroup,
+                createdAt = createdAt,
+            )
+            val received = sent.copy(
+                id = UUID.randomUUID().toString(),
+                clientUid = UUID.randomUUID().toString(),
+                accountId = draft.toAccountId,
+                txnType = draft.receivedLegType,
+                direction = TxnDirection.Credit,
+            )
+            entryRepository.addTransfer(sent, received)
+        } else {
+            entryRepository.addEntry(
+                Entry(
                     id = UUID.randomUUID().toString(),
                     clientUid = UUID.randomUUID().toString(),
+                    entryDate = date,
+                    txnId = draft.txnId,
+                    accountId = draft.accountId,
+                    expenseName = draft.expenseName,
+                    moreInfo = draft.moreInfo,
+                    txnType = draft.txnType,
+                    txnFreq = TxnFrequency.Monthly,
+                    amount = Money(minor),
+                    direction = draft.direction,
+                    transferGroup = null,
+                    createdAt = createdAt,
+                ),
+            )
+        }
+    }
+
+    private suspend fun saveEdit(draft: EntryDraft, date: LocalDate, minor: Long, original: EditingOriginal) {
+        when (original) {
+            is EditingOriginal.Plain -> entryRepository.updateEntry(
+                Entry(
+                    id = original.id,
+                    clientUid = original.clientUid,
+                    entryDate = date,
+                    txnId = draft.txnId,
+                    accountId = draft.accountId,
+                    expenseName = draft.expenseName,
+                    moreInfo = draft.moreInfo,
+                    txnType = draft.txnType,
+                    txnFreq = TxnFrequency.Monthly,
+                    amount = Money(minor),
+                    direction = draft.direction,
+                    transferGroup = null,
+                    createdAt = original.createdAt,
+                ),
+            )
+            is EditingOriginal.Transfer -> {
+                val debit = Entry(
+                    id = original.debitId,
+                    clientUid = original.debitClientUid,
                     entryDate = date,
                     txnId = draft.txnId,
                     accountId = draft.accountId,
@@ -210,45 +330,26 @@ class EntryViewModel @Inject constructor(
                     txnFreq = TxnFrequency.Monthly,
                     amount = Money(minor),
                     direction = TxnDirection.Debit,
-                    transferGroup = transferGroup,
-                    createdAt = createdAt,
+                    transferGroup = original.transferGroup,
+                    createdAt = original.debitCreatedAt,
                 )
-                val received = sent.copy(
-                    id = UUID.randomUUID().toString(),
-                    clientUid = UUID.randomUUID().toString(),
+                val credit = debit.copy(
+                    id = original.creditId,
+                    clientUid = original.creditClientUid,
                     accountId = draft.toAccountId,
                     txnType = draft.receivedLegType,
                     direction = TxnDirection.Credit,
+                    createdAt = original.creditCreatedAt,
                 )
-                entryRepository.addTransfer(sent, received)
-            } else {
-                entryRepository.addEntry(
-                    Entry(
-                        id = UUID.randomUUID().toString(),
-                        clientUid = UUID.randomUUID().toString(),
-                        entryDate = date,
-                        txnId = draft.txnId,
-                        accountId = draft.accountId,
-                        expenseName = draft.expenseName,
-                        moreInfo = draft.moreInfo,
-                        txnType = draft.txnType,
-                        txnFreq = TxnFrequency.Monthly,
-                        amount = Money(minor),
-                        direction = draft.direction,
-                        transferGroup = null,
-                        createdAt = createdAt,
-                    ),
-                )
+                entryRepository.updateTransfer(debit, credit)
             }
-            saving = false
-            this@EntryViewModel.draft = null
-            dateText = initialDateText()
-            _uiState.value = EntryUiState.Saved
         }
     }
 
-    private fun initialDateText(): TextFieldValue {
-        val text = today().format(FULL_DATE_FORMAT)
+    private fun initialDateText(): TextFieldValue = dateTextFor(null)
+
+    private fun dateTextFor(date: LocalDate?): TextFieldValue {
+        val text = (date ?: today()).format(FULL_DATE_FORMAT)
         return TextFieldValue(text, TextRange(text.length))
     }
 }

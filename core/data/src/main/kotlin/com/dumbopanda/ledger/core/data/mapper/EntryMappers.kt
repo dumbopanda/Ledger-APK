@@ -34,10 +34,12 @@ fun EntryDto.toEntity(): EntryEntity = EntryEntity(
     deletedAt = deletedAt?.let(Instant::parse),
 )
 
-// A freshly created local row: not yet pushed, so `updatedAt` is just its own
-// creation time and `deletedAt` is always null -- there is no other valid
-// state for a row that has never left this device.
-fun Entry.toEntity(): EntryEntity = EntryEntity(
+// A freshly created OR edited local row. [updatedAt] defaults to [createdAt] -- right for a
+// brand-new row (both are "now"), wrong for C4's edit path, which passes the real current
+// time while [createdAt] stays whatever the caller froze at edit-start (§7.6: "the original
+// rows are frozen at the moment editing starts"), so an edited entry doesn't jump to the top
+// of its day in History just because it was touched.
+fun Entry.toEntity(updatedAt: Instant = createdAt): EntryEntity = EntryEntity(
     id = id,
     clientUid = clientUid,
     entryDate = entryDate,
@@ -51,7 +53,7 @@ fun Entry.toEntity(): EntryEntity = EntryEntity(
     direction = direction,
     transferGroup = transferGroup,
     createdAt = createdAt,
-    updatedAt = createdAt,
+    updatedAt = updatedAt,
     deletedAt = null,
 )
 

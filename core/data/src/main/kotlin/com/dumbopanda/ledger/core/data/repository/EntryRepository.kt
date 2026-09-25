@@ -27,6 +27,11 @@ private const val ENTRY = "entry"
  * IS the delete, per §5.2), cascades to every leg sharing a `transferGroup`, and hard-deletes
  * instead only when [OpLog] reports the row was never synced in the first place
  * ([EnqueueOutcome.CANCELLED] -- insert+delete, nothing to keep a tombstone for).
+ *
+ * §7.6's `updateEntry`/`updateTransfer` (C4): same shared-transaction contract, but the
+ * caller passes an [Entry] carrying the ORIGINAL row's `id`/`clientUid`/`createdAt` -- "frozen
+ * at the moment editing starts" -- so this always overwrites that exact row (`@Upsert` keys on
+ * `id`) and enqueues an [Op.Update], never a second insert.
  */
 @Singleton
 class EntryRepository @Inject constructor(
@@ -37,6 +42,11 @@ class EntryRepository @Inject constructor(
 
     suspend fun addTransfer(sent: Entry, received: Entry) =
         writeTransfer(sessionDatabaseHolder.database(), clock, sent, received)
+
+    suspend fun updateEntry(entry: Entry) = writeEntryUpdate(sessionDatabaseHolder.database(), clock, entry)
+
+    suspend fun updateTransfer(sent: Entry, received: Entry) =
+        writeTransferUpdate(sessionDatabaseHolder.database(), clock, sent, received)
 
     suspend fun deleteEntry(id: String) = deleteEntry(sessionDatabaseHolder.database(), clock, id)
 
@@ -71,6 +81,30 @@ private suspend fun enqueueInsert(db: LedgerDatabase, clock: LedgerClock, entry:
     db.entryDao().upsert(entity)
     OpLog(db.pendingOpDao(), clock).enqueue(
         Op.Insert(ENTRY, entity.clientUid, Json.encodeToString(entity.toPushRow())),
+    )
+}
+
+internal suspend fun writeEntryUpdate(db: LedgerDatabase, clock: LedgerClock, entry: Entry) {
+    db.withTransaction {
+        enqueueUpdate(db, clock, entry)
+    }
+}
+
+internal suspend fun writeTransferUpdate(db: LedgerDatabase, clock: LedgerClock, sent: Entry, received: Entry) {
+    require(sent.transferGroup != null && sent.transferGroup == received.transferGroup) {
+        "updateTransfer requires both legs to share a non-null transferGroup"
+    }
+    db.withTransaction {
+        enqueueUpdate(db, clock, sent)
+        enqueueUpdate(db, clock, received)
+    }
+}
+
+private suspend fun enqueueUpdate(db: LedgerDatabase, clock: LedgerClock, entry: Entry) {
+    val entity = entry.toEntity(updatedAt = clock.now())
+    db.entryDao().upsert(entity)
+    OpLog(db.pendingOpDao(), clock).enqueue(
+        Op.Update(ENTRY, entity.clientUid, Json.encodeToString(entity.toPushRow())),
     )
 }
 

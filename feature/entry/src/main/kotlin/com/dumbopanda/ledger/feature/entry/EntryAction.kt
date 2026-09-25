@@ -21,4 +21,6 @@ sealed interface EntryAction {
     data object SaveTapped : EntryAction
     data object ConfirmConfirmed : EntryAction
     data object ConfirmDismissed : EntryAction
+    // §7.6: resets the form completely and toasts "Edit cancelled — nothing changed".
+    data object CancelEdit : EntryAction
 }

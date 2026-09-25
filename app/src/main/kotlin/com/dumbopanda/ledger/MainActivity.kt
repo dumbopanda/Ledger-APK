@@ -54,7 +54,7 @@ private fun LedgerApp() {
             Column(Modifier.weight(1f)) {
                 when (tab) {
                     TempTab.ADD -> EntryRoute()
-                    TempTab.HISTORY -> HistoryRoute()
+                    TempTab.HISTORY -> HistoryRoute(onEditRequested = { tab = TempTab.ADD })
                 }
             }
         }

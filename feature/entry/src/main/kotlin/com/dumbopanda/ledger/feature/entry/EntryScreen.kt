@@ -1,7 +1,9 @@
 package com.dumbopanda.ledger.feature.entry
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,21 +14,26 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dumbopanda.ledger.core.designsystem.LedgerTheme
 import com.dumbopanda.ledger.core.designsystem.component.LedgerBottomSheet
+import com.dumbopanda.ledger.core.designsystem.component.LedgerCard
 import com.dumbopanda.ledger.core.designsystem.component.LedgerPillButton
 import com.dumbopanda.ledger.core.designsystem.component.LedgerTextField
 import com.dumbopanda.ledger.core.domain.AmountFieldValue
 import com.dumbopanda.ledger.core.domain.DateFieldState
 import com.dumbopanda.ledger.core.domain.EntryDraft
+import com.dumbopanda.ledger.core.domain.FormatAmountUseCase
 import com.dumbopanda.ledger.core.domain.OwedToMeItem
 import com.dumbopanda.ledger.core.model.Account
 import com.dumbopanda.ledger.core.model.TxnDirection
@@ -37,15 +44,24 @@ import com.dumbopanda.ledger.feature.entry.component.SelfTransferToggle
 import com.dumbopanda.ledger.feature.entry.component.TransferAccountChips
 import com.dumbopanda.ledger.feature.entry.component.TxnTypeCombo
 import com.dumbopanda.ledger.feature.entry.component.WillGetBackField
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+private val BANNER_DATE_FORMAT = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 
 /**
- * §7.5's Add Entry form -- ADD mode only, per this VM's own scope note. Field order per
- * `ui-spec.md`: Amount → Account(s) → Category → Transaction name → Note → Date →
- * "Will I get this back?" → Save.
+ * §7.5's Add Entry form, plus §7.6's edit mode -- "the same form does both jobs" (one set of
+ * fields, one set of rules), which [EntryViewModel] mirrors by branching on whether it's
+ * currently editing rather than keeping two code paths. Field order per `ui-spec.md`: Amount
+ * → Account(s) → Category → Transaction name → Note → Date → "Will I get this back?" → Save.
  */
 @Composable
 fun EntryRoute(viewModel: EntryViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { message -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show() }
+    }
     EntryScreen(uiState = uiState, onAction = viewModel::onAction)
 }
 
@@ -101,6 +117,10 @@ private fun EntryForm(state: EntryUiState.Ready, onAction: (EntryAction) -> Unit
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
     ) {
+        if (state.isEditing) {
+            EditBanner(draft, onCancel = { onAction(EntryAction.CancelEdit) })
+        }
+
         AmountCard(
             amount = draft.amount,
             onAmountChange = { onAction(EntryAction.AmountKeystroke(it.clean, it.caret)) },
@@ -188,7 +208,7 @@ private fun EntryForm(state: EntryUiState.Ready, onAction: (EntryAction) -> Unit
         }
 
         LedgerPillButton(
-            text = "Add Entry",
+            text = if (state.isEditing) "Save Changes" else "Add Entry",
             onClick = { onAction(EntryAction.SaveTapped) },
             enabled = state.blockedMessage == null && !state.saving,
             modifier = Modifier.padding(top = 24.dp),
@@ -205,17 +225,34 @@ private fun EntryForm(state: EntryUiState.Ready, onAction: (EntryAction) -> Unit
 
     if (state.showConfirmSheet) {
         LedgerBottomSheet(onDismissRequest = { onAction(EntryAction.ConfirmDismissed) }) {
-            Text("Add this entry?", style = MaterialTheme.typography.titleMedium)
+            Text(if (state.isEditing) "Save these changes?" else "Add this entry?", style = MaterialTheme.typography.titleMedium)
             Text(
                 text = state.confirmSentence,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 12.dp),
             )
             LedgerPillButton(
-                text = "Add entry",
+                text = if (state.isEditing) "Save changes" else "Add entry",
                 onClick = { onAction(EntryAction.ConfirmConfirmed) },
                 modifier = Modifier.padding(top = 20.dp),
             )
+        }
+    }
+}
+
+// §7.6: "A banner above the form: Y3k9d2 · 14 Sep 2026 · ₹4,500.00 + Cancel."
+@Composable
+private fun EditBanner(draft: EntryDraft, onCancel: () -> Unit) {
+    LedgerCard(modifier = Modifier.padding(bottom = 8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            val amountText = "₹" + FormatAmountUseCase().toDisplay(draft.amount.clean.ifBlank { "0" })
+            val dateText = draft.resolvedDate?.format(BANNER_DATE_FORMAT).orEmpty()
+            Text(
+                "${draft.txnId.value} · $dateText · $amountText",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onCancel) { Text("Cancel") }
         }
     }
 }
@@ -251,6 +288,7 @@ private fun EntryScreenPreview() {
                 showConfirmSheet = false,
                 confirmSentence = "",
                 saving = false,
+                isEditing = false,
             ),
             onAction = {},
         )

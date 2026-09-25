@@ -175,4 +175,61 @@ class EntryRepositoryTest {
         deleteEntry(db, clock, "does-not-exist")
         assertTrue(db.pendingOpDao().page(10).isEmpty())
     }
+
+    // §7.6 / C4 -------------------------------------------------------------------------------
+
+    @Test
+    fun `updateEntry overwrites the same row and enqueues an update op, not an insert`() = runTest {
+        writeEntry(db, clock, entry(id = "local-1", expenseName = "Groceries", amountMinor = 5_000))
+        db.pendingOpDao().page(10).forEach { db.pendingOpDao().deleteBySeq(it.seq) } // simulate: already pushed
+
+        val edited = entry(id = "local-1", expenseName = "Groceries (corrected)", amountMinor = 7_500)
+        writeEntryUpdate(db, clock, edited)
+
+        val row = db.entryDao().findById("local-1")
+        assertEquals("Groceries (corrected)", row?.expenseName)
+        assertEquals(7_500L, row?.amountMinor)
+
+        val pending = db.pendingOpDao().page(10)
+        assertEquals(1, pending.size)
+        assertEquals("update", pending.single().op)
+    }
+
+    @Test
+    fun `updateEntry preserves createdAt -- an edit does not jump to the top of History`() = runTest {
+        val original = entry(id = "local-1")
+        writeEntry(db, clock, original)
+        db.pendingOpDao().page(10).forEach { db.pendingOpDao().deleteBySeq(it.seq) }
+
+        val laterClock = LedgerClock { Instant.parse("2026-09-25T09:00:00Z") }
+        writeEntryUpdate(db, laterClock, original.copy(expenseName = "Renamed"))
+
+        val row = db.entryDao().findById("local-1")
+        assertEquals(original.createdAt, row?.createdAt)
+        assertEquals(Instant.parse("2026-09-25T09:00:00Z"), row?.updatedAt)
+    }
+
+    @Test
+    fun `updateTransfer overwrites both legs and enqueues two update ops`() = runTest {
+        val sent = entry(id = "local-1", clientUid = "client-sent", direction = TxnDirection.Debit, transferGroup = "group-1")
+        val received = entry(id = "local-2", clientUid = "client-received", direction = TxnDirection.Credit, transferGroup = "group-1")
+        writeTransfer(db, clock, sent, received)
+        db.pendingOpDao().page(10).forEach { db.pendingOpDao().deleteBySeq(it.seq) }
+
+        writeTransferUpdate(db, clock, sent.copy(amount = Money(9_999)), received.copy(amount = Money(9_999)))
+
+        val legs = db.entryDao().transferLegs("group-1")
+        assertEquals(setOf(9_999L), legs.map { it.amountMinor }.toSet())
+        assertEquals(2, db.pendingOpDao().page(10).size)
+        assertTrue(db.pendingOpDao().page(10).all { it.op == "update" })
+    }
+
+    @Test
+    fun `updateTransfer refuses legs with no transfer group`() {
+        val sent = entry(clientUid = "client-sent", transferGroup = null)
+        val received = entry(clientUid = "client-received", transferGroup = null)
+        assertThrows(IllegalArgumentException::class.java) {
+            runTest { writeTransferUpdate(db, clock, sent, received) }
+        }
+    }
 }

@@ -26,6 +26,9 @@ sealed interface EntryUiState {
         val showConfirmSheet: Boolean,
         val confirmSentence: String,
         val saving: Boolean,
+        // §7.6: true while editing an existing entry (reached via History's Edit button) --
+        // drives the banner + Cancel, "Save Changes" label, and the confirm sheet's title.
+        val isEditing: Boolean,
     ) : EntryUiState
 
     // Terminal for this VM instance -- the Route reacts to this to reset/navigate away.
