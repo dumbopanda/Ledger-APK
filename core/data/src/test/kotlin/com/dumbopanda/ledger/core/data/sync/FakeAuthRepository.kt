@@ -15,4 +15,6 @@ class FakeAuthRepository(var refreshSucceeds: Boolean = true) : AuthRepository {
         refreshCallCount++
         return refreshSucceeds
     }
+
+    override fun currentEmail(): String? = null
 }

@@ -61,4 +61,6 @@ class SupabaseAuthRepository @Inject constructor(
             ),
         )
     }.onFailure { e -> Log.e(TAG, "refreshSession failed", e) }.isSuccess
+
+    override fun currentEmail(): String? = supabase.auth.currentSessionOrNull()?.user?.email
 }

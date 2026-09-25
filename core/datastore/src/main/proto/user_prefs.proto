@@ -15,4 +15,11 @@ enum SyncMode {
 
 message UserPrefs {
   SyncMode sync_mode = 1;
+  // §7.13 Security. Named so proto3's zero-value default is the SPEC'S
+  // default, not the opposite of it: "hide amounts (default on)" is
+  // show_amounts_in_app_switcher = false, its own unset default.
+  bool show_amounts_in_app_switcher = 2;
+  // "Require biometric to open (default off)" -- default false needs no
+  // inversion trick, unlike the field above.
+  bool require_biometric_to_open = 3;
 }

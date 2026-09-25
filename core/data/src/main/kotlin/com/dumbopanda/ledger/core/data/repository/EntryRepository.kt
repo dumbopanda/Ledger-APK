@@ -8,6 +8,7 @@ import com.dumbopanda.ledger.core.data.mapper.toPushRow
 import com.dumbopanda.ledger.core.data.sync.EnqueueOutcome
 import com.dumbopanda.ledger.core.data.sync.Op
 import com.dumbopanda.ledger.core.data.sync.OpLog
+import com.dumbopanda.ledger.core.data.sync.SyncScheduler
 import com.dumbopanda.ledger.core.database.LedgerDatabase
 import com.dumbopanda.ledger.core.model.Entry
 import kotlinx.serialization.json.Json
@@ -32,29 +33,56 @@ private const val ENTRY = "entry"
  * caller passes an [Entry] carrying the ORIGINAL row's `id`/`clientUid`/`createdAt` -- "frozen
  * at the moment editing starts" -- so this always overwrites that exact row (`@Upsert` keys on
  * `id`) and enqueues an [Op.Update], never a second insert.
+ *
+ * **Found and fixed 25 Sep 2026, C7:** every write here enqueues a pending op, but nothing
+ * was ever calling [SyncScheduler] -- §5.5/§5.6's trigger 3 ("an op was just enqueued") was
+ * built in Sprint B and never wired to a real caller, so no write anywhere in the app has ever
+ * actually triggered a push. Every public method now notifies the scheduler after its
+ * transaction commits (never inside `withTransaction` -- WorkManager/DataStore I/O has no
+ * business blocking a Room transaction), using whatever [UserPrefsRepository.currentSyncMode]
+ * currently says.
  */
 @Singleton
 class EntryRepository @Inject constructor(
     private val sessionDatabaseHolder: SessionDatabaseHolder,
+    private val syncScheduler: SyncScheduler,
+    private val userPrefsRepository: UserPrefsRepository,
     private val clock: LedgerClock,
 ) {
-    suspend fun addEntry(entry: Entry) = writeEntry(sessionDatabaseHolder.database(), clock, entry)
+    suspend fun addEntry(entry: Entry) {
+        writeEntry(sessionDatabaseHolder.database(), clock, entry)
+        notifySync()
+    }
 
-    suspend fun addTransfer(sent: Entry, received: Entry) =
+    suspend fun addTransfer(sent: Entry, received: Entry) {
         writeTransfer(sessionDatabaseHolder.database(), clock, sent, received)
+        notifySync()
+    }
 
-    suspend fun updateEntry(entry: Entry) = writeEntryUpdate(sessionDatabaseHolder.database(), clock, entry)
+    suspend fun updateEntry(entry: Entry) {
+        writeEntryUpdate(sessionDatabaseHolder.database(), clock, entry)
+        notifySync()
+    }
 
-    suspend fun updateTransfer(sent: Entry, received: Entry) =
+    suspend fun updateTransfer(sent: Entry, received: Entry) {
         writeTransferUpdate(sessionDatabaseHolder.database(), clock, sent, received)
+        notifySync()
+    }
 
-    suspend fun deleteEntry(id: String) = deleteEntry(sessionDatabaseHolder.database(), clock, id)
+    suspend fun deleteEntry(id: String) {
+        val anyQueued = deleteEntry(sessionDatabaseHolder.database(), clock, id)
+        if (anyQueued) notifySync()
+    }
 
     // §7.10's From/To account display for a transfer leg -- a one-off lookup, not reactive
     // (unlike owedToMeEntries, the detail sheet doesn't need every transfer group live, only
     // the one currently open).
     suspend fun transferLegs(group: String): List<Entry> =
         sessionDatabaseHolder.database().entryDao().transferLegs(group).map { it.toDomain() }
+
+    private suspend fun notifySync() {
+        syncScheduler.onOpEnqueued(userPrefsRepository.currentSyncMode())
+    }
 }
 
 // Top-level, not a method on EntryRepository, so tests can drive the actual transactional
@@ -108,7 +136,11 @@ private suspend fun enqueueUpdate(db: LedgerDatabase, clock: LedgerClock, entry:
     )
 }
 
-internal suspend fun deleteEntry(db: LedgerDatabase, clock: LedgerClock, id: String) {
+// Returns whether ANY leg actually queued a pending op -- false when every leg was
+// never-synced (CANCELLED), which is the one case the caller must NOT bother the sync
+// scheduler about, since there is nothing left to push.
+internal suspend fun deleteEntry(db: LedgerDatabase, clock: LedgerClock, id: String): Boolean {
+    var anyQueued = false
     db.withTransaction {
         val entity = db.entryDao().findById(id) ?: return@withTransaction
         val legs = entity.transferGroup?.let { db.entryDao().transferLegs(it) } ?: listOf(entity)
@@ -121,8 +153,12 @@ internal suspend fun deleteEntry(db: LedgerDatabase, clock: LedgerClock, id: Str
                 // Never synced -- nothing to keep a tombstone for, same as §5.2's
                 // insert+delete rule for the entity table, not just the op log.
                 EnqueueOutcome.CANCELLED -> db.entryDao().deleteByClientUid(leg.clientUid)
-                EnqueueOutcome.QUEUED -> db.entryDao().softDelete(leg.id, deletedAt)
+                EnqueueOutcome.QUEUED -> {
+                    db.entryDao().softDelete(leg.id, deletedAt)
+                    anyQueued = true
+                }
             }
         }
     }
+    return anyQueued
 }

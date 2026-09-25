@@ -7,6 +7,7 @@ import com.dumbopanda.ledger.core.data.mapper.toEntity
 import com.dumbopanda.ledger.core.data.mapper.toPushRow
 import com.dumbopanda.ledger.core.data.sync.Op
 import com.dumbopanda.ledger.core.data.sync.OpLog
+import com.dumbopanda.ledger.core.data.sync.SyncScheduler
 import com.dumbopanda.ledger.core.database.LedgerDatabase
 import com.dumbopanda.ledger.core.model.Account
 import kotlinx.coroutines.flow.Flow
@@ -27,11 +28,14 @@ private val SEED_NAMES = listOf("Domestic", "International", "Cash")
  * Accounts screen (C6) needs everything else here -- rename, archive/unarchive, reorder, and
  * [allAccounts] (archived included, so the screen can still show and unarchive them). Every
  * write shares [EntryRepository]'s pattern: the entity write and its op enqueue share one Room
- * transaction, per [OpLog]'s own contract.
+ * transaction, per [OpLog]'s own contract -- and, since C7, notifies [SyncScheduler] after that
+ * transaction commits, same fix and same reasoning as [EntryRepository]'s own doc.
  */
 @Singleton
 class AccountRepository @Inject constructor(
     private val sessionDatabaseHolder: SessionDatabaseHolder,
+    private val syncScheduler: SyncScheduler,
+    private val userPrefsRepository: UserPrefsRepository,
     private val clock: LedgerClock,
 ) {
     // §7.5.4: "generated from live accounts, never disabled" -- active means not archived.
@@ -42,19 +46,36 @@ class AccountRepository @Inject constructor(
     // still display."
     fun allAccounts(): Flow<List<Account>> = allAccounts { sessionDatabaseHolder.database() }
 
-    suspend fun addAccount(account: Account) = writeAccount(sessionDatabaseHolder.database(), clock, account)
+    suspend fun addAccount(account: Account) {
+        writeAccount(sessionDatabaseHolder.database(), clock, account)
+        notifySync()
+    }
 
-    suspend fun renameAccount(id: String, name: String) =
+    suspend fun renameAccount(id: String, name: String) {
         renameAccount(sessionDatabaseHolder.database(), clock, id, name.trim())
+        notifySync()
+    }
 
-    suspend fun setArchived(id: String, archived: Boolean) =
+    suspend fun setArchived(id: String, archived: Boolean) {
         setArchived(sessionDatabaseHolder.database(), clock, id, archived)
+        notifySync()
+    }
 
-    suspend fun reorder(orderedIds: List<String>) = reorder(sessionDatabaseHolder.database(), clock, orderedIds)
+    suspend fun reorder(orderedIds: List<String>) {
+        reorder(sessionDatabaseHolder.database(), clock, orderedIds)
+        notifySync()
+    }
 
     // §2 / §7.2: idempotent by construction (see the internal function's own doc) -- safe to
     // call from more than one screen's ViewModel without coordinating who seeds first.
-    suspend fun ensureSeeded() = ensureSeeded(sessionDatabaseHolder.database(), clock)
+    suspend fun ensureSeeded() {
+        val seeded = ensureSeeded(sessionDatabaseHolder.database(), clock)
+        if (seeded) notifySync()
+    }
+
+    private suspend fun notifySync() {
+        syncScheduler.onOpEnqueued(userPrefsRepository.currentSyncMode())
+    }
 }
 
 internal fun activeAccounts(databaseProvider: () -> LedgerDatabase): Flow<List<Account>> =
@@ -109,7 +130,10 @@ private suspend fun enqueueAccountUpdate(db: LedgerDatabase, clock: LedgerClock,
 // and the Accounts tab both loading on first launch, say) can't both observe zero accounts and
 // both seed -- whichever transaction commits first is the one that sticks, the second sees a
 // non-zero count once it runs and does nothing.
-internal suspend fun ensureSeeded(db: LedgerDatabase, clock: LedgerClock) {
+// Returns whether it actually seeded anything -- false on every call after the first, which
+// is the common case (called from more than one ViewModel's init on most app opens).
+internal suspend fun ensureSeeded(db: LedgerDatabase, clock: LedgerClock): Boolean {
+    var seeded = false
     db.withTransaction {
         if (db.accountDao().countLive() > 0) return@withTransaction
         val now = clock.now()
@@ -127,5 +151,7 @@ internal suspend fun ensureSeeded(db: LedgerDatabase, clock: LedgerClock) {
                 Op.Insert(ACCOUNT, entity.clientUid, Json.encodeToString(entity.toPushRow())),
             )
         }
+        seeded = true
     }
+    return seeded
 }

@@ -13,4 +13,10 @@ interface AuthRepository {
     // giving up to SessionExpired. Returns false if the refresh itself fails
     // (e.g. the refresh token is also invalid).
     suspend fun refreshSession(): Boolean
+
+    // §7.13's Settings > Account: "Signed-in Google address." A synchronous read of whatever
+    // the auth client currently holds in memory -- SessionStore (§7.3) deliberately stores
+    // only userId/accessToken/refreshToken, not email, so this is the one place email is
+    // available at all.
+    fun currentEmail(): String?
 }
