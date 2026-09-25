@@ -38,26 +38,42 @@ import java.time.LocalDate
 
 /**
  * §7.13. **Not built here** (present as informational/disabled rows, not silently omitted):
- * Delete account is C11's -- 7 steps and a public web page, neither of which exist. "Require
- * biometric to open" persists its toggle but enforces nothing yet -- the gate belongs in
- * §7.1's Boot routing, C9's job, which doesn't exist to gate. "Hide amounts in the app
- * switcher" is the one security toggle that's actually wired end to end -- MainActivity
- * applies `FLAG_SECURE` from it. Export/import (§7.14) are real, via SAF launchers owned by
- * this Composable (the ViewModel only ever sees a [android.net.Uri], never the picker itself).
- * The nightly nudge banner shows here rather than app-wide, since there's no shared shell yet
- * to host a global banner (C9's job) -- see this Composable's own body for where it renders.
+ * "Require biometric to open" persists its toggle -- the actual gate lives in the app module's
+ * `BiometricGate` (C9), wrapping Restoring/Home, not here. "Hide amounts in the app switcher"
+ * is the one security toggle MainActivity itself enforces via `FLAG_SECURE`. Export/import
+ * (§7.14) are real, via SAF launchers owned by this Composable (the ViewModel only ever sees a
+ * [android.net.Uri], never the picker itself). Delete account (C11) is real too, but lives on
+ * its own screen (`DeleteAccountRoute`) rather than a Settings dialog, per §7.17's own 7-step
+ * shape -- this row only navigates there. The nightly nudge banner shows here rather than
+ * app-wide, since there's no shared shell yet to host a global banner (C9's job) -- see this
+ * Composable's own body for where it renders.
  */
 @Composable
-fun SettingsRoute(onAccountsRequested: () -> Unit = {}, onSignedOut: () -> Unit = {}, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsRoute(
+    onAccountsRequested: () -> Unit = {},
+    onSignedOut: () -> Unit = {},
+    onDeleteAccountRequested: () -> Unit = {},
+    viewModel: SettingsViewModel = hiltViewModel(),
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     LaunchedEffect(viewModel) { viewModel.signedOut.collect { onSignedOut() } }
     LaunchedEffect(viewModel) { viewModel.events.collect { message -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show() } }
-    SettingsScreen(uiState = uiState, onAction = viewModel::onAction, onAccountsRequested = onAccountsRequested)
+    SettingsScreen(
+        uiState = uiState,
+        onAction = viewModel::onAction,
+        onAccountsRequested = onAccountsRequested,
+        onDeleteAccountRequested = onDeleteAccountRequested,
+    )
 }
 
 @Composable
-internal fun SettingsScreen(uiState: SettingsUiState, onAction: (SettingsAction) -> Unit, onAccountsRequested: () -> Unit) {
+internal fun SettingsScreen(
+    uiState: SettingsUiState,
+    onAction: (SettingsAction) -> Unit,
+    onAccountsRequested: () -> Unit,
+    onDeleteAccountRequested: () -> Unit = {},
+) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             if (uiState.showNightlyNudge) {
@@ -68,7 +84,7 @@ internal fun SettingsScreen(uiState: SettingsUiState, onAction: (SettingsAction)
             item { BackupSection(uiState, onAction) }
             item { SecuritySection(uiState, onAction) }
             item { AboutSection() }
-            item { AccountSection(uiState, onAction) }
+            item { AccountSection(uiState, onAction, onDeleteAccountRequested) }
         }
     }
 
@@ -215,7 +231,7 @@ private fun AboutSection() {
 }
 
 @Composable
-private fun AccountSection(uiState: SettingsUiState, onAction: (SettingsAction) -> Unit) {
+private fun AccountSection(uiState: SettingsUiState, onAction: (SettingsAction) -> Unit, onDeleteAccountRequested: () -> Unit) {
     SectionTitle("Account")
     LedgerCard {
         Text(uiState.signedInEmail ?: "Signed in", style = MaterialTheme.typography.bodyLarge)
@@ -224,7 +240,7 @@ private fun AccountSection(uiState: SettingsUiState, onAction: (SettingsAction) 
                 Text("Sign out")
             }
         }
-        TextButton(onClick = { onAction(SettingsAction.DeleteAccountTapped) }, enabled = false, modifier = Modifier.padding(top = 4.dp)) {
+        TextButton(onClick = onDeleteAccountRequested, modifier = Modifier.padding(top = 4.dp)) {
             Text("Delete account", color = MaterialTheme.colorScheme.error)
         }
     }

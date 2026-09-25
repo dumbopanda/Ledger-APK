@@ -7,6 +7,9 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.IDToken
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.rpc
+import kotlinx.serialization.json.buildJsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -63,4 +66,9 @@ class SupabaseAuthRepository @Inject constructor(
     }.onFailure { e -> Log.e(TAG, "refreshSession failed", e) }.isSuccess
 
     override fun currentEmail(): String? = supabase.auth.currentSessionOrNull()?.user?.email
+
+    override suspend fun deleteAccount(): Result<Unit> = runCatching {
+        supabase.postgrest.rpc("delete_my_account", buildJsonObject { })
+        Unit
+    }.onFailure { e -> Log.e(TAG, "deleteAccount failed", e) }
 }

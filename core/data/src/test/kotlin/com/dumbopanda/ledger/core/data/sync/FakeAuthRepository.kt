@@ -17,4 +17,6 @@ class FakeAuthRepository(var refreshSucceeds: Boolean = true) : AuthRepository {
     }
 
     override fun currentEmail(): String? = null
+
+    override suspend fun deleteAccount(): Result<Unit> = error("not used in these tests")
 }

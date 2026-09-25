@@ -21,6 +21,7 @@ sealed interface SettingsAction {
     data object SignOutConfirmed : SettingsAction // "Sign out anyway"
     data object SignOutGuardDismissed : SettingsAction
 
-    // C11's own block -- present so the row exists, not wired to real deletion yet.
-    data object DeleteAccountTapped : SettingsAction
+    // C11's own block lives on its own screen (DeleteAccountRoute), reached via a plain
+    // callback from AccountSection's row -- same shape as AccountsSection's onAccountsRequested
+    // -- rather than through this action dispatch, so no SettingsAction case is needed for it.
 }

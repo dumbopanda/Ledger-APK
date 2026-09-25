@@ -33,4 +33,15 @@ class LedgerDataStoreFactory @Inject constructor(
         serializer = ConsentStateSerializer,
         produceFile = { File(context.filesDir, "datastore/consent_state.pb") },
     )
+
+    // §7.17 step 6: "Wipe the local DB file, DataStore and session." Deliberately does NOT
+    // touch consent_state.pb -- that's device-scoped, not this account's, and a later sign-in
+    // on the same device shouldn't be forced through the consent pane again just because a
+    // DIFFERENT account was deleted from it. Caller (AccountDeletionRepository) is responsible
+    // for closing any open DataStore instance for this userId first; deleting a file out from
+    // under a live DataStore is the same hazard as deleting a Room file with an open connection.
+    fun deleteUserData(userId: String) {
+        File(context.filesDir, "datastore/sync_cursors-$userId.pb").delete()
+        File(context.filesDir, "datastore/user_prefs-$userId.pb").delete()
+    }
 }

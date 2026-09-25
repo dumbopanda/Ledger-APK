@@ -28,6 +28,7 @@ private enum class HomeTab { ADD, HISTORY, ACCOUNTS, SETTINGS }
 fun HomeScreen(
     sessionExpiredNote: Boolean,
     onSignedOut: () -> Unit,
+    onDeleteAccountRequested: () -> Unit,
 ) {
     var tab by remember { mutableStateOf(HomeTab.ADD) }
 
@@ -59,6 +60,7 @@ fun HomeScreen(
                 HomeTab.SETTINGS -> SettingsRoute(
                     onAccountsRequested = { tab = HomeTab.ACCOUNTS },
                     onSignedOut = onSignedOut,
+                    onDeleteAccountRequested = onDeleteAccountRequested,
                 )
             }
         }

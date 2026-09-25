@@ -26,8 +26,9 @@ import kotlinx.coroutines.launch
 import java.time.ZoneId
 import javax.inject.Inject
 
-/** §7.13. Delete account (C11) is present but stubbed. Export/import (§7.14) are real; see
- * [SettingsScreen] for the SAF launcher wiring this ViewModel doesn't own. */
+/** §7.13. Export/import (§7.14) are real; see [SettingsScreen] for the SAF launcher wiring this
+ * ViewModel doesn't own. Delete account (C11) is real too, but lives on its own screen/ViewModel
+ * (`DeleteAccountRoute`/`DeleteAccountViewModel`) -- this ViewModel only ever navigates there. */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val userPrefsRepository: UserPrefsRepository,
@@ -98,7 +99,6 @@ class SettingsViewModel @Inject constructor(
                 showSignOutGuard = false
             }
             SettingsAction.SignOutConfirmed -> signOut()
-            SettingsAction.DeleteAccountTapped -> Unit // C11
         }
         publish()
     }

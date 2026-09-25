@@ -10,6 +10,7 @@ import com.dumbopanda.ledger.core.data.repository.BootRoute
 import com.dumbopanda.ledger.core.navigation.LedgerDestinations
 import com.dumbopanda.ledger.feature.auth.SignInRoute
 import com.dumbopanda.ledger.feature.onboarding.OnboardingRoute
+import com.dumbopanda.ledger.feature.settings.DeleteAccountRoute
 
 /**
  * §7.0's nav graph, assembled the only place that can see every feature module. [bootRoute] is
@@ -51,14 +52,33 @@ fun LedgerNavHost(bootRoute: BootRoute) {
 
         composable(LedgerDestinations.HOME) {
             BiometricGate {
-                HomeScreen(sessionExpiredNote = false, onSignedOut = { navController.navigateToSignInFresh() })
+                HomeScreen(
+                    sessionExpiredNote = false,
+                    onSignedOut = { navController.navigateToSignInFresh() },
+                    onDeleteAccountRequested = { navController.navigate(LedgerDestinations.DELETE_ACCOUNT) },
+                )
             }
         }
 
         composable(LedgerDestinations.HOME_SESSION_EXPIRED) {
             BiometricGate {
-                HomeScreen(sessionExpiredNote = true, onSignedOut = { navController.navigateToSignInFresh() })
+                HomeScreen(
+                    sessionExpiredNote = true,
+                    onSignedOut = { navController.navigateToSignInFresh() },
+                    onDeleteAccountRequested = { navController.navigate(LedgerDestinations.DELETE_ACCOUNT) },
+                )
             }
+        }
+
+        composable(LedgerDestinations.DELETE_ACCOUNT) {
+            DeleteAccountRoute(
+                // §7.17 step 7: "Confirmation screen -> Onboarding." The account, session and
+                // local database are all gone by this point (AccountDeletionRepository), so
+                // this is the same end state as a genuinely fresh install -- popUpTo(0) means
+                // there is no Home/Restoring left on the back stack to accidentally return to.
+                onAccountDeleted = { navController.navigate(LedgerDestinations.ONBOARDING) { popUpTo(0) } },
+                onCancel = { navController.popBackStack() },
+            )
         }
 
         composable(LedgerDestinations.FORCED_UPDATE) {

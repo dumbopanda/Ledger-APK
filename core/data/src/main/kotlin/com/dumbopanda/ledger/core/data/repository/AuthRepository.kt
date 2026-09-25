@@ -19,4 +19,12 @@ interface AuthRepository {
     // only userId/accessToken/refreshToken, not email, so this is the one place email is
     // available at all.
     fun currentEmail(): String?
+
+    // §7.17 step 5: `delete_my_account()` (0007_account_deletion.sql) -- SECURITY DEFINER,
+    // trusts whatever `auth.uid()` the caller's current JWT carries, with no server-side
+    // re-authentication check of its own. Step 4's Credential Manager re-auth is therefore a
+    // client-side UX gate only; this call itself just uses the ALREADY-ambient session, not
+    // whatever came back from re-auth (see AccountDeletionRepository's own doc for why re-auth
+    // never touches SessionStore or the Supabase client's session state).
+    suspend fun deleteAccount(): Result<Unit>
 }

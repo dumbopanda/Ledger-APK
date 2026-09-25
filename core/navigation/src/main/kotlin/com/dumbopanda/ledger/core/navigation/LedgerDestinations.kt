@@ -18,4 +18,5 @@ object LedgerDestinations {
     const val FORCED_UPDATE = "forced_update"
     const val HOME = "home"
     const val HOME_SESSION_EXPIRED = "home_session_expired"
+    const val DELETE_ACCOUNT = "delete_account"
 }
