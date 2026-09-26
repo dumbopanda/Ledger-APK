@@ -23,6 +23,14 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.App.Starting">
 
+        <!-- Sentry's own SentryInitProvider auto-inits from manifest meta-data BEFORE
+             LedgerApplication.onCreate ever runs, and crashes immediately (every single
+             launch) since no io.sentry.dsn meta-data exists here on purpose: the DSN lives in
+             BuildConfig (local.properties), not the manifest, per this project's own pattern
+             for the Supabase URL/key. Manual init in LedgerApplication.onCreate needs
+             auto-init off, or the two race and the provider always loses. -->
+        <meta-data android:name="io.sentry.auto-init" android:value="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true">
