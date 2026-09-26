@@ -3,11 +3,14 @@ package com.dumbopanda.ledger.feature.settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
@@ -34,6 +37,8 @@ import com.dumbopanda.ledger.core.designsystem.component.LedgerBannerTone
 import com.dumbopanda.ledger.core.designsystem.component.LedgerCard
 import com.dumbopanda.ledger.core.designsystem.component.LedgerPillButton
 import com.dumbopanda.ledger.core.designsystem.component.LedgerSegmentedButton
+import com.dumbopanda.ledger.core.ui.openEmail
+import com.dumbopanda.ledger.core.ui.openUrl
 import java.time.LocalDate
 
 /**
@@ -207,6 +212,10 @@ private fun SecuritySection(uiState: SettingsUiState, onAction: (SettingsAction)
     }
 }
 
+private const val PRIVACY_POLICY_URL = "https://dumbopanda.github.io/Ledger-Pages/privacy/"
+private const val TERMS_URL = "https://dumbopanda.github.io/Ledger-Pages/terms/"
+private const val SUPPORT_EMAIL = "theledgerapp.support@gmail.com"
+
 @Composable
 private fun AboutSection() {
     SectionTitle("About")
@@ -216,18 +225,29 @@ private fun AboutSection() {
     }
     LedgerCard {
         Text("Version ${versionName ?: "unknown"}", style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(8.dp))
+        AboutLinkRow("Privacy policy") { context.openUrl(PRIVACY_POLICY_URL) }
+        AboutLinkRow("Terms") { context.openUrl(TERMS_URL) }
+        AboutLinkRow("Support") { context.openEmail(SUPPORT_EMAIL) }
+        // No open-source licences page yet -- listed as informational/disabled rather
+        // than silently omitted, same pattern this screen already uses elsewhere.
         Text(
-            "Privacy policy · Terms · Open-source licences · Support",
+            "Open-source licences — coming soon",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        Text(
-            "Links go live with the Play listing (C13)",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
         )
     }
+}
+
+@Composable
+private fun AboutLinkRow(label: String, onClick: () -> Unit) {
+    Text(
+        label,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp),
+    )
 }
 
 @Composable

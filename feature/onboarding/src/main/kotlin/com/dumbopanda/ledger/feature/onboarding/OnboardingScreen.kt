@@ -1,6 +1,7 @@
 package com.dumbopanda.ledger.feature.onboarding
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,13 +22,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dumbopanda.ledger.core.designsystem.LedgerTheme
-import com.dumbopanda.ledger.core.designsystem.component.LedgerBanner
-import com.dumbopanda.ledger.core.designsystem.component.LedgerBannerTone
 import com.dumbopanda.ledger.core.designsystem.component.LedgerPillButton
+import com.dumbopanda.ledger.core.ui.openUrl
 
 private const val PANE_COUNT = 3
 private const val CONSENT_PANE_INDEX = 2
@@ -134,12 +135,14 @@ private fun ConsentPane() {
         style = MaterialTheme.typography.bodyLarge,
     )
     Spacer(Modifier.height(16.dp))
-    // Phase 9's own gate is "both policy URLs resolve" -- neither exists yet (no domain has
-    // been registered in this project as of C9), so this stays plain, un-clickable text
-    // rather than a Uri.parse() to a page that isn't live.
-    LedgerBanner(
-        text = "Privacy policy: link added once published.",
-        tone = LedgerBannerTone.Info,
+    // Phase 9's own gate ("both policy URLs resolve") is met as of C12 -- both pages are
+    // live at dumbopanda.github.io/Ledger-Pages.
+    val context = LocalContext.current
+    Text(
+        "Read the full Privacy Policy",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.clickable { context.openUrl("https://dumbopanda.github.io/Ledger-Pages/privacy/") },
     )
 }
 
