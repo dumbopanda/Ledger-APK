@@ -4,10 +4,24 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewTreeObserver
 import android.view.WindowManager
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
+import com.dumbopanda.ledger.core.designsystem.CanvasLight
+import com.dumbopanda.ledger.core.designsystem.LedgerUiScale
+import com.dumbopanda.ledger.core.designsystem.component.LedgerToastHost
+import com.dumbopanda.ledger.core.designsystem.component.LocalLedgerToast
+import com.dumbopanda.ledger.core.designsystem.component.rememberLedgerToastState
+import android.graphics.Color as AndroidColor
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -33,6 +47,13 @@ class MainActivity : FragmentActivity() {
     private val bootViewModel: BootViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Android 15+ draws every app edge to edge regardless; declaring it explicitly (with dark
+        // status-bar icons on the cream page) is what lets LedgerRoot pad content clear of the
+        // status bar instead of leaving the tab row underneath it, where taps never reached it.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
 
         // §7.1: "Single decision point, no UI beyond the system splash." Theme.App.Starting
@@ -85,6 +106,17 @@ class MainActivity : FragmentActivity() {
 private fun LedgerRoot(bootViewModel: BootViewModel) {
     val route = bootViewModel.route ?: return // splash screen is still covering this frame
     LedgerTheme {
-        LedgerNavHost(bootRoute = route)
+        // index.html's --ui-scale: 0.9, so every size is the web's own CSS px value.
+        LedgerUiScale {
+            val toast = rememberLedgerToastState()
+            CompositionLocalProvider(LocalLedgerToast provides toast) {
+                // The cream page runs under the status and navigation bars; content is padded
+                // clear of them (and of the keyboard) so nothing sits where a tap can't land.
+                Box(Modifier.fillMaxSize().background(CanvasLight).safeDrawingPadding()) {
+                    LedgerNavHost(bootRoute = route)
+                    LedgerToastHost(toast)
+                }
+            }
+        }
     }
 }

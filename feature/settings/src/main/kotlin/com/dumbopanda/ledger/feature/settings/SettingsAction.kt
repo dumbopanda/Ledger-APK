@@ -13,7 +13,6 @@ sealed interface SettingsAction {
     // ViewModel never touches the picker itself.
     data class ExportRequested(val uri: Uri) : SettingsAction
     data class ImportRequested(val uri: Uri) : SettingsAction
-    data object NudgeSnoozed : SettingsAction
 
     // §7.16's sign-out guard.
     data object SignOutTapped : SettingsAction

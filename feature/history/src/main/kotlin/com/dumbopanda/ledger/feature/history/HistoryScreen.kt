@@ -1,84 +1,75 @@
 package com.dumbopanda.ledger.feature.history
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.paging.compose.LazyPagingItems
-import androidx.paging.compose.collectAsLazyPagingItems
-import com.dumbopanda.ledger.core.designsystem.CanvasDark
+import com.dumbopanda.ledger.core.data.repository.EntrySyncMark
+import com.dumbopanda.ledger.core.designsystem.Amber
+import com.dumbopanda.ledger.core.designsystem.AmberDeepInk
+import com.dumbopanda.ledger.core.designsystem.CanvasLight
+import com.dumbopanda.ledger.core.designsystem.Coral
+import com.dumbopanda.ledger.core.designsystem.EditedFill
+import com.dumbopanda.ledger.core.designsystem.EditedInk
+import com.dumbopanda.ledger.core.designsystem.Forest
+import com.dumbopanda.ledger.core.designsystem.HairlineLt
 import com.dumbopanda.ledger.core.designsystem.HairlineStrong
 import com.dumbopanda.ledger.core.designsystem.Lime
-import com.dumbopanda.ledger.core.designsystem.LedgerShapes
 import com.dumbopanda.ledger.core.designsystem.MutedOnDark
 import com.dumbopanda.ledger.core.designsystem.NetOutOnDark
-import com.dumbopanda.ledger.core.designsystem.component.LedgerCard
+import com.dumbopanda.ledger.core.designsystem.TextDark
+import com.dumbopanda.ledger.core.designsystem.TextMuted
+import com.dumbopanda.ledger.core.designsystem.White
+import com.dumbopanda.ledger.core.designsystem.accountTone
 import com.dumbopanda.ledger.core.designsystem.component.LedgerSubTabs
+import com.dumbopanda.ledger.core.designsystem.component.LocalLedgerToast
+import com.dumbopanda.ledger.core.designsystem.component.SubTabMark
 import com.dumbopanda.ledger.core.domain.DayGroup
-import com.dumbopanda.ledger.core.domain.FormatAmountUseCase
-import com.dumbopanda.ledger.core.domain.GroupEntriesByDayUseCase
 import com.dumbopanda.ledger.core.domain.HistoryRow
 import com.dumbopanda.ledger.core.domain.OwedToMeItem
+import com.dumbopanda.ledger.core.domain.dayLabel
 import com.dumbopanda.ledger.core.domain.foldTransfers
+import com.dumbopanda.ledger.core.domain.formatDisplayDate
+import com.dumbopanda.ledger.core.domain.formatMoney
+import com.dumbopanda.ledger.core.domain.monthName
 import com.dumbopanda.ledger.core.model.Account
 import com.dumbopanda.ledger.core.model.Entry
 import com.dumbopanda.ledger.core.model.TxnDirection
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import java.time.YearMonth
 
-private val DAY_HEADER_FORMAT = DateTimeFormatter.ofPattern("EEEE d MMM", Locale.ENGLISH)
-private val OWED_DATE_FORMAT = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
-private val amountFormatter = FormatAmountUseCase()
-
-// Rupee text for a possibly-zero-or-negative minor-unit total (a pure-income or pure-transfer
-// day/month can net to <= 0) -- Money itself requires > 0, so §7.7's summary tiles format the
-// sign and magnitude directly rather than routing through it.
-private fun signedRupees(minor: Long): String {
-    val sign = if (minor < 0) "-" else ""
-    val magnitude = kotlin.math.abs(minor)
-    val rupees = magnitude / 100
-    val paise = magnitude % 100
-    val clean = if (paise == 0L) rupees.toString() else "$rupees.${paise.toString().padStart(2, '0')}"
-    return sign + amountFormatter.toDisplay(clean)
-}
-
+/**
+ * History: [header] (title bar + tabs) scrolls away with the list, exactly as the web page does;
+ * [monthToggle] is the one control History shares with Stats, drawn here above the sub-tabs.
+ */
 @Composable
-fun HistoryRoute(onEditRequested: () -> Unit = {}, viewModel: HistoryViewModel = hiltViewModel()) {
+fun HistoryRoute(
+    header: @Composable () -> Unit,
+    monthOffset: Int,
+    monthToggle: @Composable () -> Unit,
+    onEditRequested: () -> Unit,
+    viewModel: HistoryViewModel = hiltViewModel(),
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val pagedEntries = viewModel.pagedEntries.collectAsLazyPagingItems()
+    val toast = LocalLedgerToast.current
+    LaunchedEffect(monthOffset) { viewModel.setMonthOffset(monthOffset) }
+    LaunchedEffect(viewModel) { viewModel.events.collect { toast.show(it) } }
     HistoryScreen(
         uiState = uiState,
-        pagedEntries = pagedEntries,
+        header = header,
+        monthToggle = monthToggle,
         onAction = { action ->
             viewModel.onAction(action)
-            // Handing the entry over happens via EditRequestStore (data layer); this callback
-            // is the UI-only "switch to the Add tab" concern MainActivity's temporary switch
-            // needs -- C9's real nav graph replaces both with one navigate() call.
             if (action == HistoryAction.EditTapped) onEditRequested()
         },
     )
@@ -87,245 +78,207 @@ fun HistoryRoute(onEditRequested: () -> Unit = {}, viewModel: HistoryViewModel =
 @Composable
 internal fun HistoryScreen(
     uiState: HistoryUiState,
-    pagedEntries: LazyPagingItems<Entry>,
+    header: @Composable () -> Unit,
+    monthToggle: @Composable () -> Unit,
     onAction: (HistoryAction) -> Unit,
 ) {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize()) {
-            LedgerSubTabs(
-                options = listOf(HistoryTab.RECENT, HistoryTab.OWED_TO_ME),
-                selected = uiState.tab,
-                onSelect = { onAction(HistoryAction.TabSelected(it)) },
-                label = { if (it == HistoryTab.RECENT) "Recent" else "Owed to me (${uiState.owedToMeOpen.size})" },
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-            )
-            when (uiState.tab) {
-                HistoryTab.RECENT -> RecentTab(uiState, pagedEntries, onAction)
-                HistoryTab.OWED_TO_ME -> OwedToMeTab(uiState, onAction)
-            }
-        }
-    }
-
-    uiState.detail?.let { detail -> EntryDetailSheet(state = detail, onAction = onAction) }
-}
-
-@Composable
-private fun RecentTab(uiState: HistoryUiState, pagedEntries: LazyPagingItems<Entry>, onAction: (HistoryAction) -> Unit) {
-    // Materialized once per load rather than driven item-by-item, because grouping (by day)
-    // and folding (transfer legs into one row) both need to see neighboring items, which a
-    // pure per-index `items(lazyPagingItems.itemCount)` render can't do. §7.7's own cap (40
-    // rows per page, "Show earlier entries") keeps this small enough that re-deriving on every
-    // page-load is cheap -- this is not re-run per keystroke or per scroll frame.
-    val entries = remember(pagedEntries.itemCount) { pagedEntries.itemSnapshotList.toList().filterNotNull() }
-    val dayGroups = remember(entries) { GroupEntriesByDayUseCase().group(entries) }
-
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        item { MonthSummaryCard(uiState.monthSummary.outMinor, uiState.monthSummary.inMinor, uiState.monthSummary.netMinor) }
-        if (dayGroups.isEmpty()) {
-            item {
-                Text(
-                    "Nothing here yet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 32.dp),
-                )
-            }
-        }
-        items(dayGroups) { group -> DayCard(group, uiState.accounts, onAction) }
-    }
-}
-
-@Composable
-private fun MonthSummaryCard(outMinor: Long, inMinor: Long, netMinor: Long) {
-    LedgerCard(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            SummaryTile("Out", outMinor, MaterialTheme.colorScheme.error)
-            SummaryTile("In", inMinor, MaterialTheme.colorScheme.primary)
-            SummaryTile("Net", netMinor, MaterialTheme.colorScheme.onSurface)
-        }
-    }
-}
-
-@Composable
-private fun SummaryTile(label: String, minor: Long, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("₹" + signedRupees(minor), style = MaterialTheme.typography.titleMedium, color = color)
-    }
-}
-
-// .ledger-card + .day-head -- a day is one object, so it gets the heavier border-strong
-// rule and a dark header band (day label uppercase in lime, net amount colored by sign),
-// distinct from the plain white .group/.panel cards used elsewhere.
-@Composable
-private fun DayCard(group: DayGroup, accounts: Map<String, Account>, onAction: (HistoryAction) -> Unit) {
-    Surface(
-        shape = LedgerShapes.medium,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, HairlineStrong),
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-    ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(CanvasDark)
-                    .padding(horizontal = 18.dp, vertical = 13.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
+        item { header() }
+        // `.stats-screen { padding: 14px 20px 32px; gap: 16px }`
+        item {
+            Column(
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text(
-                    group.date.format(DAY_HEADER_FORMAT).uppercase(Locale.ENGLISH),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 0.6.sp,
-                    color = Lime,
-                )
-                Text(
-                    "₹" + signedRupees(group.netMinor),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = when {
-                        group.netMinor < 0 -> NetOutOnDark
-                        group.netMinor > 0 -> Lime
-                        else -> MutedOnDark
+                monthToggle()
+                LedgerSubTabs(
+                    options = listOf(HistoryTab.RECENT, HistoryTab.OWED_TO_ME),
+                    selected = uiState.tab,
+                    onSelect = { onAction(HistoryAction.TabSelected(it)) },
+                    label = { if (it == HistoryTab.RECENT) "Recent" else "Owed to me" },
+                    mark = { tab ->
+                        when (tab) {
+                            HistoryTab.RECENT -> uiState.recentCount.takeIf { it > 0 }?.let { SubTabMark.Count(it) }
+                            HistoryTab.OWED_TO_ME -> uiState.owedToMeOpen.size.takeIf { it > 0 }?.let { SubTabMark.Badge(it) }
+                        }
                     },
                 )
             }
-            val rows = remember(group) { foldTransfers(group.entries) }
-            Column(Modifier.padding(16.dp)) {
-                rows.forEach { row ->
-                    when (row) {
-                        is HistoryRow.Single -> EntryRow(
-                            entry = row.entry,
-                            account = accounts[row.entry.accountId],
-                            onClick = { onAction(HistoryAction.EntryTapped(row.entry)) },
-                        )
-                        is HistoryRow.Transfer -> TransferRow(
-                            sent = row.sent,
-                            received = row.received,
-                            fromAccount = accounts[row.sent.accountId],
-                            toAccount = accounts[row.received.accountId],
-                            onClick = { onAction(HistoryAction.EntryTapped(row.sent)) },
-                        )
-                    }
-                }
-            }
+        }
+        when (uiState.tab) {
+            HistoryTab.RECENT -> recent(uiState, onAction)
+            HistoryTab.OWED_TO_ME -> owedToMe(uiState, onAction)
         }
     }
+    uiState.detail?.let { EntryDetailSheet(it, uiState.accounts, uiState.syncMarks, onAction) }
 }
 
-@Composable
-private fun Tile(letter: Char) {
-    Box(
-        modifier = Modifier.size(36.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(letter.toString(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private val paneItem = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
+
+private fun androidx.compose.foundation.lazy.LazyListScope.recent(state: HistoryUiState, onAction: (HistoryAction) -> Unit) {
+    if (state.dayGroups.isEmpty()) {
+        item { Column(paneItem) { EmptyMonth(state.month, state.today.let { YearMonth.from(it) } == state.month) } }
+        return
     }
-}
-
-@Composable
-private fun EntryRow(entry: Entry, account: Account?, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Tile(account?.name?.firstOrNull() ?: '?')
-        Column(Modifier.weight(1f)) {
-            Text(entry.expenseName, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                "${account?.name.orEmpty()} · ${entry.txnType}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        val signed = if (entry.direction == TxnDirection.Debit) "− " else "+ "
-        Text(
-            signed + "₹" + amountFormatter.toDisplay(entry.amount.toCleanRupeeString()),
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (entry.direction == TxnDirection.Debit) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-        )
+    // `.day-list { gap: 18px }` -- the gap between days is bigger than any gap inside one.
+    itemsIndexed(state.dayGroups, key = { _, group -> group.date.toString() }) { index, group ->
+        Column(paneItem.padding(top = if (index == 0) 0.dp else 18.dp)) { DayCard(group, state, onAction) }
     }
-}
-
-@Composable
-private fun TransferRow(sent: Entry, received: Entry, fromAccount: Account?, toAccount: Account?, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Tile('⇄')
-        Column(Modifier.weight(1f)) {
-            Text("Self transfer", style = MaterialTheme.typography.bodyLarge)
-            Text(
-                "${fromAccount?.name.orEmpty()} → ${toAccount?.name.orEmpty()}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Text(
-            "₹" + amountFormatter.toDisplay(sent.amount.toCleanRupeeString()),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-@Composable
-private fun OwedToMeTab(uiState: HistoryUiState, onAction: (HistoryAction) -> Unit) {
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    if (state.hasMore) {
         item {
-            Text("Open", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
-            LedgerCard {
-                if (uiState.owedToMeOpen.isEmpty()) {
-                    Text(
-                        "Nothing outstanding — entries you mark Y show up here until the money comes back.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Column { uiState.owedToMeOpen.forEach { item -> OwedRow(item, uiState.accounts, onAction) } }
-                }
-            }
-        }
-        if (uiState.owedToMeClosed.isNotEmpty()) {
-            item {
-                Text("Closed", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-                LedgerCard(modifier = Modifier.alpha(0.55f)) {
-                    Column { uiState.owedToMeClosed.forEach { item -> OwedRow(item, uiState.accounts, onAction) } }
-                }
+            Column(paneItem) {
+                ShowMoreButton("Show earlier in ${monthName(state.month)}", { onAction(HistoryAction.ShowEarlierTapped) })
             }
         }
     }
 }
 
 @Composable
-private fun OwedRow(item: OwedToMeItem, accounts: Map<String, Account>, onAction: (HistoryAction) -> Unit) {
-    val account = accounts[item.accountId]
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onAction(HistoryAction.OwedItemTapped(item)) }
-            .padding(vertical = 8.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(item.expenseName, style = MaterialTheme.typography.bodyLarge)
-            Text("₹" + amountFormatter.toDisplay(item.amount.toCleanRupeeString()), style = MaterialTheme.typography.bodyLarge)
+private fun EmptyMonth(month: YearMonth, isCurrent: Boolean) {
+    if (isCurrent) {
+        EmptyCard("Nothing this month yet", "Add an entry and it shows up here.")
+    } else {
+        EmptyCard("Nothing in ${monthName(month)}", "No entries were added for that month.")
+    }
+}
+
+@Composable
+private fun DayCard(group: DayGroup, state: HistoryUiState, onAction: (HistoryAction) -> Unit) {
+    val rows = foldTransfers(group.entries)
+    val net = group.netMinor
+    LedgerDayCard {
+        DayHead(
+            label = dayLabel(group.date, state.today),
+            figure = when {
+                net > 0 -> "+ ₹${formatMoney(net)}"
+                net < 0 -> "− ₹${formatMoney(-net)}"
+                else -> ""
+            },
+            figureColor = when {
+                net > 0 -> Lime
+                net < 0 -> NetOutOnDark
+                else -> MutedOnDark
+            },
+        )
+        rows.forEachIndexed { index, row ->
+            val last = index == rows.lastIndex
+            when (row) {
+                is HistoryRow.Single -> SingleRow(row.entry, state, !last) { onAction(HistoryAction.EntryTapped(row.entry)) }
+                is HistoryRow.Transfer -> TransferRow(row.sent, row.received, state, !last) { onAction(HistoryAction.EntryTapped(row.sent)) }
+            }
         }
-        val meta = if (item.isOpen) {
-            "${account?.name.orEmpty()} · Opened ${item.openedDate.format(OWED_DATE_FORMAT)}"
-        } else {
-            "${account?.name.orEmpty()} · Opened ${item.openedDate.format(OWED_DATE_FORMAT)} · " +
-                "Closed ${item.closedDate?.format(OWED_DATE_FORMAT).orEmpty()}"
+    }
+}
+
+private fun tileFor(account: Account?, order: Map<String, Int>): RowTile {
+    val tone = accountTone(order[account?.id] ?: 0)
+    return RowTile(account?.name?.firstOrNull()?.uppercase() ?: "?", tone.fill)
+}
+
+private fun accountTag(text: String, account: Account?, order: Map<String, Int>): RowTag {
+    val tone = accountTone(order[account?.id] ?: 0)
+    return RowTag(text, tone.fill, tone.ink)
+}
+
+private fun syncTags(marks: Collection<EntrySyncMark?>): List<RowTag> = buildList {
+    if (EntrySyncMark.OnDevice in marks) add(RowTag("on this device", Amber, AmberDeepInk))
+    if (EntrySyncMark.Edited in marks) add(RowTag("edited", EditedFill, EditedInk))
+}
+
+@Composable
+private fun SingleRow(entry: Entry, state: HistoryUiState, divider: Boolean, onClick: () -> Unit) {
+    val account = state.accounts[entry.accountId]
+    val out = entry.direction == TxnDirection.Debit
+    val tags = buildList {
+        add(accountTag(account?.name.orEmpty(), account, state.accountOrder))
+        if (entry.txnType.isNotBlank()) add(RowTag(entry.txnType))
+        if (entry.txnId.isY) add(RowTag("Owed"))
+        addAll(syncTags(listOf(state.syncMarks[entry.clientUid])))
+    }
+    TxnRow(
+        tile = tileFor(account, state.accountOrder),
+        name = entry.expenseName.ifBlank { "—" },
+        amount = (if (out) "− " else "+ ") + "₹" + formatMoney(entry.amount.minor),
+        amountColor = if (out) Coral else Forest,
+        tags = tags,
+        note = entry.moreInfo,
+        onClick = onClick,
+        showDivider = divider,
+    )
+}
+
+@Composable
+private fun TransferRow(sent: Entry, received: Entry, state: HistoryUiState, divider: Boolean, onClick: () -> Unit) {
+    val from = state.accounts[sent.accountId]
+    val to = state.accounts[received.accountId]
+    val tags = buildList {
+        add(accountTag("${from?.name.orEmpty()} → ${to?.name.orEmpty()}", from, state.accountOrder))
+        if (sent.txnType.isNotBlank()) add(RowTag(sent.txnType))
+        addAll(syncTags(listOf(state.syncMarks[sent.clientUid], state.syncMarks[received.clientUid])))
+    }
+    TxnRow(
+        tile = RowTile("⇄", White, TextDark, border = HairlineStrong),
+        name = "Self transfer",
+        amount = "₹" + formatMoney(sent.amount.minor),
+        amountColor = TextMuted,
+        tags = tags,
+        note = sent.moreInfo,
+        onClick = onClick,
+        showDivider = divider,
+    )
+}
+
+// "One list, one place to look -- open items on top in their own card, closed ones below in
+// theirs, grayed out. Never two tabs to check."
+private fun androidx.compose.foundation.lazy.LazyListScope.owedToMe(state: HistoryUiState, onAction: (HistoryAction) -> Unit) {
+    if (state.owedToMeOpen.isEmpty() && state.owedToMeClosed.isEmpty()) {
+        item {
+            Column(paneItem) {
+                EmptyCard("Nothing here yet", "Anything you mark \"Yes, I'll get this back\" shows up here, open or settled.")
+            }
         }
-        Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    if (state.owedToMeOpen.isNotEmpty()) {
+        item { Column(paneItem) { OwedCard("Open", state.owedToMeOpen, closed = false, state, onAction) } }
+    }
+    if (state.owedToMeClosed.isNotEmpty()) {
+        item {
+            Column(paneItem.padding(top = if (state.owedToMeOpen.isEmpty()) 0.dp else 18.dp)) {
+                OwedCard("Closed", state.owedToMeClosed, closed = true, state, onAction)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OwedCard(label: String, items: List<OwedToMeItem>, closed: Boolean, state: HistoryUiState, onAction: (HistoryAction) -> Unit) {
+    LedgerDayCard {
+        DayHead(label = label, figure = items.size.toString())
+        items.forEachIndexed { index, item ->
+            val account = state.accounts[item.accountId]
+            val dates = if (closed) {
+                "Opened ${formatDisplayDate(item.openedDate)} · Closed ${item.closedDate?.let(::formatDisplayDate).orEmpty()}"
+            } else {
+                "Opened ${formatDisplayDate(item.openedDate)}"
+            }
+            val tile = if (closed) {
+                RowTile(account?.name?.firstOrNull()?.uppercase() ?: "?", CanvasLight, TextMuted, border = HairlineLt)
+            } else {
+                tileFor(account, state.accountOrder)
+            }
+            val acctTag = if (closed) RowTag(account?.name.orEmpty()) else accountTag(account?.name.orEmpty(), account, state.accountOrder)
+            TxnRow(
+                tile = tile,
+                name = item.expenseName,
+                amount = "₹" + formatMoney(item.amount.minor),
+                amountColor = TextDark,
+                tags = listOf(acctTag, RowTag(dates)),
+                note = null,
+                onClick = { onAction(HistoryAction.OwedItemTapped(item)) },
+                showDivider = index != items.lastIndex,
+                dimmed = closed,
+            )
+        }
     }
 }

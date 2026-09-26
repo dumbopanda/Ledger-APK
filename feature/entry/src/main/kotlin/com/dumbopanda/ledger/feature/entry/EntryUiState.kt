@@ -2,36 +2,57 @@ package com.dumbopanda.ledger.feature.entry
 
 import androidx.compose.ui.text.input.TextFieldValue
 import com.dumbopanda.ledger.core.domain.DateFieldState
+import com.dumbopanda.ledger.core.domain.DraftField
 import com.dumbopanda.ledger.core.domain.EntryDraft
 import com.dumbopanda.ledger.core.domain.OwedToMeItem
 import com.dumbopanda.ledger.core.model.Account
 
-/** §7.5's Add Entry form, top to bottom per `ui-spec.md`'s reordered field list. */
+/** `.quick-date-btn.active` -- which of Today/Yesterday (if either) describes the date field. */
+enum class QuickDate { TODAY, YESTERDAY }
+
 sealed interface EntryUiState {
     data object Loading : EntryUiState
 
-    // §7.12's "seed Domestic/International/Cash on first run" (C6) hasn't run yet, or every
-    // account has been archived -- there's nothing for the account chips to show.
+    // Every account archived, or none set up -- the chips have nothing to show.
     data object NoAccounts : EntryUiState
 
     data class Ready(
         val draft: EntryDraft,
         val dateText: TextFieldValue,
         val dateFieldState: DateFieldState,
+        val quickDate: QuickDate?,
         val accounts: List<Account>,
-        // Open items only -- this is §7.5.5's Old picker source, not the full Owed-to-me list.
+        // Every name any entry has used, most-used first -- the Transaction name dropdown.
+        val knownNames: List<String>,
+        // "Add a new name…" was picked (or the name isn't one of [knownNames]): the dropdown
+        // has become a text box, with its arrow still reopening the list.
+        val nameCustomMode: Boolean,
+        // Currently-open Y items only -- "Which open item".
         val openItems: List<OwedToMeItem>,
-        // Null when the draft is valid -- the Save button's caption (§7.5.9).
-        val blockedMessage: String?,
-        val showConfirmSheet: Boolean,
-        val confirmSentence: String,
+        // "Which one": false = New, true = Old.
+        val backOld: Boolean,
+        // The field a blocked save pointed at -- outlined red until it's edited.
+        val invalid: DraftField?,
+        // "Needs an amount, a name and a date" under the button; null once nothing's missing.
+        val caption: String?,
+        // "Add Entry" / "Add Entry • ₹450.00 Out" / "Save Changes • ₹5,000.00 Transfer".
+        val ctaText: String,
+        // Non-null while the "Add this entry?" sheet is open.
+        val confirm: ConfirmSheetContent?,
         val saving: Boolean,
-        // §7.6: true while editing an existing entry (reached via History's Edit button) --
-        // drives the banner + Cancel, "Save Changes" label, and the confirm sheet's title.
         val isEditing: Boolean,
+        // The edit banner's second line: "Y3k9d2 · 14 Sept 2026 · ₹4,500".
+        val editBannerSub: String?,
     ) : EntryUiState
+}
 
-    // Terminal for this VM instance -- the Route reacts to this to reset/navigate away.
-    // A fresh EntryViewModel (e.g. re-entering the tab) starts a new Ready state from scratch.
-    data object Saved : EntryUiState
+/** One-shot things the screen reacts to once -- not state it re-shows on recomposition. */
+sealed interface EntryEvent {
+    data class Toast(val message: String, val durationMs: Long = 2200L) : EntryEvent
+
+    // An edit was saved -- the web goes back to History so you can see it.
+    data object EditSaved : EntryEvent
+
+    // A blocked save puts the caret in the field that stopped it (the web's `el.focus()`).
+    data class FocusField(val field: DraftField) : EntryEvent
 }

@@ -1,6 +1,5 @@
 package com.dumbopanda.ledger.core.data.repository
 
-import androidx.paging.testing.asSnapshot
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.dumbopanda.ledger.core.database.LedgerDatabase
@@ -18,6 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -52,14 +52,16 @@ class HistoryRepositoryTest {
         deletedAt = deletedAt,
     )
 
+    private val september = YearMonth.of(2026, 9)
+
     @Test
-    fun `a freshly written offline entry appears in the paged snapshot instantly`() = runTest {
+    fun `a freshly written offline entry appears in its month instantly`() = runTest {
         db.entryDao().upsert(entity("01", LocalDate.of(2026, 9, 24)))
 
-        val snapshot = pagedEntries { db }.asSnapshot()
+        val month = entriesInMonth(september) { db }.first()
 
-        assertEquals(1, snapshot.size)
-        assertEquals("Entry 01", snapshot.single().expenseName)
+        assertEquals(1, month.size)
+        assertEquals("Entry 01", month.single().expenseName)
     }
 
     @Test
@@ -68,37 +70,36 @@ class HistoryRepositoryTest {
         db.entryDao().upsert(entity("02", LocalDate.of(2026, 9, 24)))
         db.entryDao().upsert(entity("03", LocalDate.of(2026, 9, 22)))
 
-        val snapshot = pagedEntries { db }.asSnapshot()
+        val month = entriesInMonth(september) { db }.first()
 
-        assertEquals(listOf("02", "03", "01"), snapshot.map { it.id })
+        assertEquals(listOf("02", "03", "01"), month.map { it.id })
     }
 
     @Test
-    fun `a soft-deleted entry never appears in the page`() = runTest {
+    fun `a soft-deleted entry never appears`() = runTest {
         db.entryDao().upsert(entity("01", LocalDate.of(2026, 9, 24), deletedAt = Instant.parse("2026-09-24T01:00:00Z")))
         db.entryDao().upsert(entity("02", LocalDate.of(2026, 9, 24)))
 
-        val snapshot = pagedEntries { db }.asSnapshot()
+        val month = entriesInMonth(september) { db }.first()
 
-        assertEquals(listOf("02"), snapshot.map { it.id })
+        assertEquals(listOf("02"), month.map { it.id })
     }
 
     @Test
-    fun `an empty history is an empty snapshot, not an error`() = runTest {
-        val snapshot = pagedEntries { db }.asSnapshot()
-        assertEquals(emptyList<String>(), snapshot.map { it.id })
+    fun `only the asked-for month comes back, both of its edge days included`() = runTest {
+        db.entryDao().upsert(entity("01", LocalDate.of(2026, 8, 31)))
+        db.entryDao().upsert(entity("02", LocalDate.of(2026, 9, 1)))
+        db.entryDao().upsert(entity("03", LocalDate.of(2026, 9, 30)))
+        db.entryDao().upsert(entity("04", LocalDate.of(2026, 10, 1)))
+
+        val month = entriesInMonth(september) { db }.first()
+
+        assertEquals(listOf("03", "02"), month.map { it.id })
     }
 
     @Test
-    fun `monthOutIn sums out and in for the month, excluding earlier and later months`() = runTest {
-        db.entryDao().upsert(entity("01", LocalDate.of(2026, 9, 5)).copy(amountMinor = 5_000, direction = TxnDirection.Debit))
-        db.entryDao().upsert(entity("02", LocalDate.of(2026, 9, 20)).copy(amountMinor = 20_000, direction = TxnDirection.Credit))
-        db.entryDao().upsert(entity("03", LocalDate.of(2026, 8, 31)).copy(amountMinor = 999_999, direction = TxnDirection.Debit))
-
-        val (out, income) = monthOutIn(java.time.YearMonth.of(2026, 9)) { db }.first()
-
-        assertEquals(5_000L, out)
-        assertEquals(20_000L, income)
+    fun `an empty month is an empty list, not an error`() = runTest {
+        assertEquals(emptyList<String>(), entriesInMonth(september) { db }.first().map { it.id })
     }
 
     @Test

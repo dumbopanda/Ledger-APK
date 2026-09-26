@@ -1,109 +1,165 @@
 package com.dumbopanda.ledger.feature.history
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.dumbopanda.ledger.core.designsystem.component.LedgerBottomSheet
-import com.dumbopanda.ledger.core.designsystem.component.LedgerSegmentedButton
-import com.dumbopanda.ledger.core.designsystem.icon.LedgerIcons
-import com.dumbopanda.ledger.core.domain.FormatAmountUseCase
+import com.dumbopanda.ledger.core.data.repository.EntrySyncMark
+import com.dumbopanda.ledger.core.designsystem.HairlineLt
+import com.dumbopanda.ledger.core.designsystem.White
+import com.dumbopanda.ledger.core.designsystem.component.LedgerPill
+import com.dumbopanda.ledger.core.designsystem.component.LedgerSheet
+import com.dumbopanda.ledger.core.designsystem.component.LedgerSheetButton
+import com.dumbopanda.ledger.core.designsystem.component.PillStyles
+import com.dumbopanda.ledger.core.designsystem.component.SheetActions
+import com.dumbopanda.ledger.core.designsystem.component.SheetButtonKind
+import com.dumbopanda.ledger.core.designsystem.component.SheetLine
+import com.dumbopanda.ledger.core.designsystem.component.SheetProps
+import com.dumbopanda.ledger.core.designsystem.component.SheetTitle
+import com.dumbopanda.ledger.core.designsystem.component.webBorder
+import com.dumbopanda.ledger.core.domain.formatConfirmDate
+import com.dumbopanda.ledger.core.domain.formatDisplayDate
+import com.dumbopanda.ledger.core.domain.formatMoneyFixed
+import com.dumbopanda.ledger.core.model.Account
+import com.dumbopanda.ledger.core.model.Entry
+import com.dumbopanda.ledger.core.model.TxnDirection
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val DETAIL_DATE_FORMAT = DateTimeFormatter.ofPattern("EEEE d MMM yyyy", Locale.ENGLISH)
+// index.html's stampText: "27 Sept, 00:15".
+private val ADDED_FORMAT = DateTimeFormatter.ofPattern("d MMM, HH:mm", Locale.UK)
+
+/** What the sheet says -- a pure function of the entry, so the wording is checked in one place. */
+data class DetailContent(val title: String, val line: String, val rows: List<Pair<String, String?>>)
+
+fun buildDetailContent(
+    entry: Entry,
+    sibling: Entry?,
+    accounts: Map<String, Account>,
+    syncMarks: Map<String, EntrySyncMark>,
+    zone: ZoneId = ZoneId.systemDefault(),
+): DetailContent {
+    val amt = formatMoneyFixed(entry.amount.minor)
+    val whenText = formatDisplayDate(entry.entryDate)
+    val added = entry.createdAt.atZone(zone).format(ADDED_FORMAT)
+    val marks = listOfNotNull(syncMarks[entry.clientUid], sibling?.let { syncMarks[it.clientUid] })
+    val status = when {
+        EntrySyncMark.Edited in marks -> "Changed here — the server still has the old version"
+        EntrySyncMark.OnDevice in marks -> "On this device, waiting to be sent"
+        else -> "Synced"
+    }
+
+    if (entry.transferGroup != null) {
+        val sent = if (entry.direction == TxnDirection.Debit) entry else (sibling ?: entry)
+        val received = if (entry.direction == TxnDirection.Debit) sibling else entry
+        val from = accounts[sent.accountId]?.name.orEmpty()
+        val to = received?.let { accounts[it.accountId]?.name }.orEmpty()
+        return DetailContent(
+            title = "Self transfer",
+            line = "₹$amt moved from your $from account to your $to account on $whenText. Two rows, one thing that happened.",
+            rows = listOf(
+                "Amount" to "₹$amt moved",
+                "From account" to from,
+                "To account" to to,
+                "Sent leg category" to sent.txnType,
+                "Received leg category" to received?.txnType,
+                "Transaction name" to entry.expenseName,
+                "Note" to entry.moreInfo,
+                "Date" to formatConfirmDate(entry.entryDate),
+                "Transaction ID" to entry.txnId.value,
+                "Added" to added,
+                "Status" to status,
+            ),
+        )
+    }
+
+    val account = accounts[entry.accountId]?.name.orEmpty()
+    val out = entry.direction == TxnDirection.Debit
+    return DetailContent(
+        title = entry.expenseName.ifBlank { "Entry" },
+        line = if (out) {
+            "₹$amt left your $account account on $whenText for ${entry.expenseName}."
+        } else {
+            "₹$amt came into your $account account on $whenText from ${entry.expenseName}."
+        },
+        rows = listOf(
+            "Amount" to "₹$amt ${if (out) "out" else "in"}",
+            "Account" to account,
+            "Category" to entry.txnType,
+            "Transaction name" to entry.expenseName,
+            "Note" to entry.moreInfo,
+            "Date" to formatConfirmDate(entry.entryDate),
+            "Will I get this back" to if (entry.txnId.isY) "Yes" else "No",
+            "Transaction ID" to entry.txnId.value,
+            "Added" to added,
+            "Status" to status,
+        ),
+    )
+}
 
 /**
- * §7.10, changed 24-25 Sep 2026: ✕ top-right is the only "just close this" affordance --
- * **no separate bottom Close button** -- and actions below the property list are Delete/Edit,
- * one row, 50/50. The Open/Close leg toggle sits top-right, immediately left of ✕ with a gap,
- * and only when [EntryDetailState.owedToMeItem] has both legs (`closeLegEntryId != null`).
+ * `#detailSheet` -- ✕ top-right as the only "just close"; Delete | Edit 50/50; and, for a Y id
+ * with both legs, the small Open | Close toggle top-right immediately left of the ✕ (the title
+ * then reserves extra right padding so the name never runs under it).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EntryDetailSheet(state: EntryDetailState, onAction: (HistoryAction) -> Unit) {
-    val entry = state.entry
-    val hasToggle = state.owedToMeItem?.closeLegEntryId != null
+fun EntryDetailSheet(
+    state: EntryDetailState,
+    accounts: Map<String, Account>,
+    syncMarks: Map<String, EntrySyncMark>,
+    onAction: (HistoryAction) -> Unit,
+) {
+    val hasLegs = state.owedToMeItem?.closeLegEntryId != null
+    val content = buildDetailContent(state.entry, state.sibling, accounts, syncMarks)
 
-    LedgerBottomSheet(onDismissRequest = { onAction(HistoryAction.DetailDismissed) }) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = entry.expenseName.ifBlank { "Self transfer" },
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f).padding(end = if (hasToggle) 12.dp else 8.dp),
-            )
-            if (hasToggle) {
-                LedgerSegmentedButton(
-                    options = listOf(true, false),
-                    selected = state.showingOpenLeg,
-                    onSelect = { onAction(HistoryAction.LegToggled(it)) },
-                    label = { if (it) "Open" else "Close" },
-                    modifier = Modifier.padding(end = 8.dp),
-                )
+    LedgerSheet(
+        onDismissRequest = { onAction(HistoryAction.DetailDismissed) },
+        topBar = {
+            if (hasLegs) {
+                Row(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 18.dp, end = 58.dp)
+                        .clip(CircleShape)
+                        .background(White)
+                        .webBorder(HairlineLt, CircleShape)
+                        .padding(2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    LedgerPill("Open", state.showingOpenLeg, { onAction(HistoryAction.LegToggled(true)) }, style = PillStyles.Leg)
+                    LedgerPill("Close", !state.showingOpenLeg, { onAction(HistoryAction.LegToggled(false)) }, style = PillStyles.Leg)
+                }
             }
-            IconButton(onClick = { onAction(HistoryAction.DetailDismissed) }) {
-                Icon(LedgerIcons.Close, contentDescription = "Close")
-            }
-        }
-
-        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-        PropertyRow("Date", entry.entryDate.format(DETAIL_DATE_FORMAT))
-        PropertyRow("Account", state.account?.name.orEmpty() + if (state.toAccount != null) " → ${state.toAccount.name}" else "")
-        PropertyRow("Expense name", entry.expenseName)
-        entry.moreInfo?.takeIf { it.isNotBlank() }?.let { PropertyRow("More info", it) }
-        PropertyRow("Type", entry.txnType)
-        PropertyRow("Amount", "₹" + FormatAmountUseCase().toDisplay(entry.amount.toCleanRupeeString()))
-        PropertyRow("Transaction ID", entry.txnId.value)
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            OutlinedButton(onClick = { onAction(HistoryAction.DeleteTapped) }, modifier = Modifier.weight(1f)) {
-                Text("Delete")
-            }
-            Button(onClick = { onAction(HistoryAction.EditTapped) }, modifier = Modifier.weight(1f)) {
-                Text("Edit")
-            }
-        }
+        },
+    ) {
+        SheetTitle(content.title, reserveEnd = if (hasLegs) 150.dp else 44.dp)
+        SheetLine(content.line)
+        SheetProps(content.rows)
+        SheetActions(
+            start = { m -> LedgerSheetButton("Delete", SheetButtonKind.Danger, { onAction(HistoryAction.DeleteTapped) }, m, enabled = !state.deleting) },
+            end = { m -> LedgerSheetButton("Edit", SheetButtonKind.Save, { onAction(HistoryAction.EditTapped) }, m) },
+        )
     }
 
     if (state.showDeleteConfirm) {
+        // The web's own confirm(): "Delete this entry? This cannot be undone."
         AlertDialog(
             onDismissRequest = { onAction(HistoryAction.DeleteCancelled) },
-            title = { Text("Delete this entry?") },
-            text = { Text(state.deleteMessage) },
+            text = { Text("Delete this entry? This cannot be undone.") },
             confirmButton = {
-                TextButton(onClick = { onAction(HistoryAction.DeleteConfirmed) }, enabled = !state.deleting) {
-                    Text("Delete")
-                }
+                TextButton(onClick = { onAction(HistoryAction.DeleteConfirmed) }, enabled = !state.deleting) { Text("Delete") }
             },
-            dismissButton = {
-                TextButton(onClick = { onAction(HistoryAction.DeleteCancelled) }) { Text("Cancel") }
-            },
+            dismissButton = { TextButton(onClick = { onAction(HistoryAction.DeleteCancelled) }) { Text("Cancel") } },
         )
-    }
-}
-
-@Composable
-private fun PropertyRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }

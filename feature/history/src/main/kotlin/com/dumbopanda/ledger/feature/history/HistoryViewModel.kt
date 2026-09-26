@@ -2,92 +2,113 @@ package com.dumbopanda.ledger.feature.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
-import androidx.paging.cachedIn
 import com.dumbopanda.ledger.core.common.LedgerClock
 import com.dumbopanda.ledger.core.data.repository.AccountRepository
 import com.dumbopanda.ledger.core.data.repository.EditRequestStore
 import com.dumbopanda.ledger.core.data.repository.EntryRepository
+import com.dumbopanda.ledger.core.data.repository.EntrySyncMark
 import com.dumbopanda.ledger.core.data.repository.HistoryRepository
+import com.dumbopanda.ledger.core.data.repository.SyncStatusRepository
+import com.dumbopanda.ledger.core.domain.GroupEntriesByDayUseCase
 import com.dumbopanda.ledger.core.domain.GroupOwedToMeUseCase
-import com.dumbopanda.ledger.core.domain.MonthSummary
 import com.dumbopanda.ledger.core.domain.OwedToMeItem
 import com.dumbopanda.ledger.core.model.Account
 import com.dumbopanda.ledger.core.model.Entry
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import javax.inject.Inject
 
+// "40 rows, then 'Show earlier'" -- and 40 more per tap.
+private const val PAGE = 40
+
 /**
- * §7.7 (Recent) + §7.8 (Owed to me) + §7.10/§7.11 (the shared entry-detail sheet, reached from
- * either tab). [pagedEntries] is kept OUTSIDE [uiState] on purpose -- the standard Paging3 +
- * Compose split (see `feature:entry`'s draft/flows split for the equivalent reasoning): a
- * `PagingData` isn't a value [combine] can usefully compare, so it's its own `Flow`, collected
- * separately via `collectAsLazyPagingItems()`.
+ * History: Recent (one month at a time, driven by the month toggle it shares with Stats) and
+ * Owed to me (every Y id, open or closed, regardless of month -- as on the web), plus the
+ * entry-detail sheet both of them open.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
     private val historyRepository: HistoryRepository,
-    private val accountRepository: AccountRepository,
+    accountRepository: AccountRepository,
     private val entryRepository: EntryRepository,
     private val editRequestStore: EditRequestStore,
+    syncStatusRepository: SyncStatusRepository,
     private val groupOwedToMe: GroupOwedToMeUseCase,
+    private val groupByDay: GroupEntriesByDayUseCase,
     private val clock: LedgerClock,
 ) : ViewModel() {
 
-    val pagedEntries: Flow<PagingData<Entry>> = historyRepository.pagedEntries().cachedIn(viewModelScope)
+    private fun today(): LocalDate = clock.now().atZone(ZoneId.systemDefault()).toLocalDate()
 
-    private fun currentMonth(): YearMonth = YearMonth.from(clock.now().atZone(ZoneId.systemDefault()))
+    private val month = MutableStateFlow(YearMonth.from(today()))
 
-    private val accounts: StateFlow<List<Account>> = accountRepository.activeAccounts()
+    private val accounts: StateFlow<List<Account>> = accountRepository.allAccounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    // Every live Y-leg, raw -- source for both owedToMeItems (grouped) and the detail sheet's
-    // Open/Close toggle, which needs the OTHER leg's full Entry, not just its OwedToMeItem
-    // summary. One reactive source, two derived uses, instead of a second repository round trip.
-    private val owedToMeEntries: StateFlow<List<Entry>> = historyRepository.owedToMeEntries()
+    private val monthEntries: StateFlow<List<Entry>> = month.flatMapLatest { historyRepository.entriesInMonth(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val owedToMeItems: StateFlow<List<OwedToMeItem>> = owedToMeEntries
-        .map { groupOwedToMe.group(it) }
+    // Every live Y leg, raw -- the Owed-to-me list and the detail sheet's Open/Close toggle,
+    // which needs the OTHER leg's full Entry.
+    private val owedEntries: StateFlow<List<Entry>> = historyRepository.owedToMeEntries()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val monthOutIn: StateFlow<Pair<Long, Long>> = historyRepository.monthOutIn(currentMonth())
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L to 0L)
+    private val owedItems: StateFlow<List<OwedToMeItem>> = owedEntries.map { groupOwedToMe.group(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val syncMarks: StateFlow<Map<String, EntrySyncMark>> = syncStatusRepository.entrySyncMarks()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private var tab = HistoryTab.RECENT
+    private var shown = PAGE
     private var detail: EntryDetailState? = null
 
-    private val _uiState = MutableStateFlow(emptyUiState())
+    private val _uiState = MutableStateFlow(publishState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
+
+    private val _events = MutableSharedFlow<String>(extraBufferCapacity = 2)
+    val events: SharedFlow<String> = _events.asSharedFlow()
 
     init {
         viewModelScope.launch {
-            combine(accounts, owedToMeItems, monthOutIn) { accs, items, outIn -> Triple(accs, items, outIn) }
-                .collect { (accs, items, outIn) -> publish(accs, items, outIn) }
+            combine(accounts, monthEntries, owedItems, syncMarks) { _, _, _, _ -> }.collect { publish() }
         }
+    }
+
+    /** The shared month toggle moved (0 = this month, negative = further back). */
+    fun setMonthOffset(offset: Int) {
+        val target = YearMonth.from(today()).plusMonths(offset.toLong())
+        if (target == month.value) return
+        month.value = target
+        shown = PAGE
+        publish()
     }
 
     fun onAction(action: HistoryAction) {
         when (action) {
             is HistoryAction.TabSelected -> tab = action.tab
-            is HistoryAction.EntryTapped -> {
-                openDetail(action.entry)
-                if (action.entry.transferGroup != null) resolveToAccount(action.entry)
-            }
+            HistoryAction.ShowEarlierTapped -> shown += PAGE
+            is HistoryAction.EntryTapped -> openDetail(action.entry)
             is HistoryAction.OwedItemTapped -> {
-                val targetId = if (action.item.isOpen) action.item.openLegEntryId else (action.item.closeLegEntryId ?: action.item.openLegEntryId)
-                owedToMeEntries.value.find { it.id == targetId }?.let(::openDetail)
+                val item = action.item
+                val targetId = if (item.isOpen) item.openLegEntryId else (item.closeLegEntryId ?: item.openLegEntryId)
+                owedEntries.value.find { it.id == targetId }?.let(::openDetail)
             }
             HistoryAction.DetailDismissed -> detail = null
             is HistoryAction.LegToggled -> toggleLeg(action.showOpen)
@@ -96,33 +117,26 @@ class HistoryViewModel @Inject constructor(
             HistoryAction.DeleteConfirmed -> confirmDelete()
             HistoryAction.EditTapped -> requestEdit()
         }
-        publish(accounts.value, owedToMeItems.value, monthOutIn.value)
+        publish()
     }
 
     private fun openDetail(entry: Entry) {
-        val accs = accounts.value.associateBy { it.id }
-        val owedItem = if (entry.txnId.isY) owedToMeItems.value.find { it.txnId == entry.txnId } else null
-        val showingOpen = owedItem == null || entry.id == owedItem.openLegEntryId
+        // The Open/Close toggle is for a loan and its repayment -- never a self transfer's legs.
+        val owedItem = if (entry.txnId.isY && entry.transferGroup == null) owedItems.value.find { it.txnId == entry.txnId } else null
         detail = EntryDetailState(
             entry = entry,
-            account = accs[entry.accountId],
-            toAccount = null,
+            sibling = null,
             owedToMeItem = owedItem,
-            showingOpenLeg = showingOpen,
+            showingOpenLeg = owedItem == null || entry.id != owedItem.closeLegEntryId,
             showDeleteConfirm = false,
-            deleteMessage = deleteMessageFor(entry, owedItem),
             deleting = false,
         )
-    }
-
-    private fun resolveToAccount(entry: Entry) {
         val group = entry.transferGroup ?: return
         viewModelScope.launch {
             val sibling = entryRepository.transferLegs(group).find { it.id != entry.id } ?: return@launch
-            if (detail?.entry?.id != entry.id) return@launch // sheet moved on before this resolved
-            val accs = accounts.value.associateBy { it.id }
-            detail = detail?.copy(toAccount = accs[sibling.accountId])
-            publish(accounts.value, owedToMeItems.value, monthOutIn.value)
+            if (detail?.entry?.id != entry.id) return@launch // the sheet moved on before this resolved
+            detail = detail?.copy(sibling = sibling)
+            publish()
         }
     }
 
@@ -130,38 +144,20 @@ class HistoryViewModel @Inject constructor(
         val current = detail ?: return
         val item = current.owedToMeItem ?: return
         val targetId = if (showOpen) item.openLegEntryId else (item.closeLegEntryId ?: return)
-        val sibling = owedToMeEntries.value.find { it.id == targetId } ?: return
-        val accs = accounts.value.associateBy { it.id }
-        detail = current.copy(
-            entry = sibling,
-            account = accs[sibling.accountId],
-            showingOpenLeg = showOpen,
-            deleteMessage = deleteMessageFor(sibling, item),
-        )
+        val leg = owedEntries.value.find { it.id == targetId } ?: return
+        detail = current.copy(entry = leg, showingOpenLeg = showOpen)
     }
 
-    private fun deleteMessageFor(entry: Entry, owedItem: OwedToMeItem?) = buildDeleteConfirmMessage(
-        amount = entry.amount,
-        expenseName = entry.expenseName,
-        date = entry.entryDate,
-        isTransferLeg = entry.transferGroup != null,
-        openTxnId = if (owedItem != null && owedItem.isOpen) entry.txnId else null,
-    )
-
-    // §7.6/C4: hands the currently-displayed leg (already whichever side the Open/Close
-    // toggle selects) to EntryViewModel via EditRequestStore. A transfer leg's sibling is
-    // resolved fresh here rather than reused from `resolveToAccount`'s result, since that one
-    // only kept the sibling's Account, not its full Entry.
+    // Hands the displayed leg (whichever side the toggle selects) to the Add Payment form.
     private fun requestEdit() {
         val entry = detail?.entry ?: return
         val group = entry.transferGroup
-        detail = null // the sheet is done its job -- the form takes over from here
+        detail = null
         if (group == null) {
             editRequestStore.request(entry, sibling = null)
         } else {
             viewModelScope.launch {
-                val sibling = entryRepository.transferLegs(group).find { it.id != entry.id }
-                editRequestStore.request(entry, sibling)
+                editRequestStore.request(entry, entryRepository.transferLegs(group).find { it.id != entry.id })
             }
         }
     }
@@ -169,31 +165,37 @@ class HistoryViewModel @Inject constructor(
     private fun confirmDelete() {
         val current = detail ?: return
         detail = current.copy(deleting = true)
-        publish(accounts.value, owedToMeItems.value, monthOutIn.value)
         viewModelScope.launch {
             entryRepository.deleteEntry(current.entry.id)
             detail = null
-            publish(accounts.value, owedToMeItems.value, monthOutIn.value)
+            publish()
+            _events.tryEmit("Deleted")
         }
     }
 
-    private fun publish(accs: List<Account>, items: List<OwedToMeItem>, outIn: Pair<Long, Long>) {
-        _uiState.value = HistoryUiState(
+    private fun publish() {
+        _uiState.value = publishState()
+    }
+
+    // Every flow read here is declared above `_uiState`, so all are initialised by the time its
+    // initialiser first calls this.
+    private fun publishState(): HistoryUiState {
+        val entries = monthEntries.value
+        val accs = accounts.value
+        val items = owedItems.value
+        return HistoryUiState(
             tab = tab,
             accounts = accs.associateBy { it.id },
-            monthSummary = MonthSummary(outMinor = outIn.first, inMinor = outIn.second),
+            accountOrder = accs.mapIndexed { index, account -> account.id to index }.toMap(),
+            month = month.value,
+            today = today(),
+            dayGroups = groupByDay.group(entries.take(shown)),
+            recentCount = entries.size,
+            hasMore = entries.size > shown,
+            syncMarks = syncMarks.value,
             owedToMeOpen = items.filter { it.isOpen }.sortedByDescending { it.openedDate },
             owedToMeClosed = items.filter { !it.isOpen }.sortedByDescending { it.closedDate },
             detail = detail,
         )
     }
-
-    private fun emptyUiState() = HistoryUiState(
-        tab = HistoryTab.RECENT,
-        accounts = emptyMap(),
-        monthSummary = MonthSummary(0, 0),
-        owedToMeOpen = emptyList(),
-        owedToMeClosed = emptyList(),
-        detail = null,
-    )
 }

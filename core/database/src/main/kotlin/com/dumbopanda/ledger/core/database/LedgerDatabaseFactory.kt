@@ -18,6 +18,12 @@ class LedgerDatabaseFactory @Inject constructor(
     fun open(userId: String): LedgerDatabase =
         Room.databaseBuilder(context, LedgerDatabase::class.java, fileNameFor(userId))
             .addMigrations(MIGRATION_1_2)
+            // Sync and boot open their own short-lived instance of this same file while the UI
+            // observes SessionDatabaseHolder's long-lived one. Room only notifies observers of
+            // writes made through their OWN instance unless this is on -- without it a send
+            // (ops deleted) or a pull (entries inserted) never reached the screen: the sync bar
+            // kept saying "1 entry saved on this device" after it had gone.
+            .enableMultiInstanceInvalidation()
             .build()
 
     companion object {

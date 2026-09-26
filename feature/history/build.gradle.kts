@@ -19,9 +19,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.hilt.navigation.compose)
-    implementation(libs.androidx.paging.runtime)
-    implementation(libs.androidx.paging.common)
-    implementation(libs.androidx.paging.compose)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

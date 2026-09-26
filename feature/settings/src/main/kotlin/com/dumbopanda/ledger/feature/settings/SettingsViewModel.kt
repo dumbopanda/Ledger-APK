@@ -7,11 +7,12 @@ import com.dumbopanda.ledger.core.common.LedgerClock
 import com.dumbopanda.ledger.core.data.backup.BackupRepository
 import com.dumbopanda.ledger.core.data.backup.ExportOutcome
 import com.dumbopanda.ledger.core.data.backup.ImportOutcome
+import com.dumbopanda.ledger.core.data.repository.AccountRepository
 import com.dumbopanda.ledger.core.data.repository.AuthRepository
+import com.dumbopanda.ledger.core.data.repository.ConnectivityChecker
 import com.dumbopanda.ledger.core.data.repository.SyncStatusRepository
 import com.dumbopanda.ledger.core.data.repository.UserPrefsRepository
 import com.dumbopanda.ledger.core.data.sync.SyncMode
-import com.dumbopanda.ledger.core.domain.shouldShowNightlyNudge
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,17 +25,29 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import javax.inject.Inject
 
-/** §7.13. Export/import (§7.14) are real; see [SettingsScreen] for the SAF launcher wiring this
- * ViewModel doesn't own. Delete account (C11) is real too, but lives on its own screen/ViewModel
- * (`DeleteAccountRoute`/`DeleteAccountViewModel`) -- this ViewModel only ever navigates there. */
+// Batched mode's own rules (SyncScheduler): 3+ go together, never held past an hour.
+private const val BATCH_FULL = 3
+private const val CEILING_SECONDS = 3600L
+private val TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.UK)
+private val STAMP = DateTimeFormatter.ofPattern("d MMM, HH:mm", Locale.UK)
+
+/**
+ * The Settings screen behind the profile button -- index.html's account screen (waiting to be
+ * sent, when to send, backup) plus what only the APK needs (accounts, security, sign-in).
+ * Export/import pick their files in the Composable; this only ever sees the resulting Uri.
+ */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val userPrefsRepository: UserPrefsRepository,
     private val syncStatusRepository: SyncStatusRepository,
     private val backupRepository: BackupRepository,
     private val authRepository: AuthRepository,
+    private val connectivityChecker: ConnectivityChecker,
+    accountRepository: AccountRepository,
     private val clock: LedgerClock,
 ) : ViewModel() {
 
@@ -46,21 +59,23 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     private val pendingCount = syncStatusRepository.pendingOpCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+    private val oldestPending = syncStatusRepository.oldestPendingAt()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     private val deadLetterCount = syncStatusRepository.deadLetterCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
-    private val hasEntries = backupRepository.hasAnyEntries()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    private val entryCount = syncStatusRepository.liveEntryCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
     private val lastBackupAt = userPrefsRepository.lastBackupAt()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    private val nudgeSnoozedUntil = userPrefsRepository.nudgeSnoozedUntil()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    private val accounts = accountRepository.activeAccounts()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private var showSignOutGuard = false
     private var signingOut = false
     private var exporting = false
     private var importing = false
 
-    private val _uiState = MutableStateFlow(emptyUiState())
+    private val _uiState = MutableStateFlow(build())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     private val _signedOut = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -71,11 +86,10 @@ class SettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            combine(syncMode, showAmounts, requireBiometric, pendingCount, deadLetterCount) { _, _, _, _, _ -> }
-                .collect { publish() }
+            combine(syncMode, showAmounts, requireBiometric, pendingCount, oldestPending) { _, _, _, _, _ -> }.collect { publish() }
         }
         viewModelScope.launch {
-            combine(hasEntries, lastBackupAt, nudgeSnoozedUntil) { _, _, _ -> }.collect { publish() }
+            combine(deadLetterCount, entryCount, lastBackupAt, accounts) { _, _, _, _ -> }.collect { publish() }
         }
     }
 
@@ -89,7 +103,6 @@ class SettingsViewModel @Inject constructor(
                 viewModelScope.launch { userPrefsRepository.setRequireBiometricToOpen(action.require) }
             is SettingsAction.ExportRequested -> export(action.uri)
             is SettingsAction.ImportRequested -> import(action.uri)
-            SettingsAction.NudgeSnoozed -> viewModelScope.launch { userPrefsRepository.setNudgeSnoozedUntil(clock.now().plusSeconds(SNOOZE_SECONDS)) }
             SettingsAction.SignOutTapped -> {
                 if (pendingCount.value > 0) showSignOutGuard = true else signOut()
             }
@@ -107,10 +120,10 @@ class SettingsViewModel @Inject constructor(
         exporting = true
         publish()
         viewModelScope.launch {
-            val message = when (val outcome = backupRepository.exportTo(uri)) {
-                is ExportOutcome.Success -> "Backup saved -- ${outcome.accountCount} accounts, ${outcome.entryCount} entries"
+            val message = when (backupRepository.exportTo(uri)) {
+                is ExportOutcome.Success -> "Backup saved"
                 ExportOutcome.NotSignedIn -> "Sign in before backing up"
-                ExportOutcome.WriteError -> "Couldn't write the backup file"
+                ExportOutcome.WriteError -> "That file could not be written"
             }
             exporting = false
             _events.tryEmit(message)
@@ -125,14 +138,14 @@ class SettingsViewModel @Inject constructor(
             val message = when (val outcome = backupRepository.importFrom(uri)) {
                 is ImportOutcome.Success ->
                     if (outcome.accountsAdded == 0 && outcome.entriesAdded == 0) {
-                        "Nothing new to import -- already up to date"
+                        "Everything in that file was already here"
                     } else {
-                        "Imported ${outcome.accountsAdded} accounts, ${outcome.entriesAdded} entries"
+                        "Restored ${outcome.entriesAdded} ${if (outcome.entriesAdded == 1) "entry" else "entries"}"
                     }
                 is ImportOutcome.UserMismatch -> "That backup belongs to a different account"
-                ImportOutcome.NotSignedIn -> "Sign in before importing"
-                ImportOutcome.InvalidFile -> "That doesn't look like a ledger backup file"
-                ImportOutcome.ReadError -> "Couldn't read that file"
+                ImportOutcome.NotSignedIn -> "Sign in before restoring"
+                ImportOutcome.InvalidFile -> "That is not a Ledger backup"
+                ImportOutcome.ReadError -> "That file could not be read"
             }
             importing = false
             _events.tryEmit(message)
@@ -152,11 +165,29 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun publish() {
-        val now = clock.now().atZone(ZoneId.systemDefault())
-        _uiState.value = SettingsUiState(
-            syncMode = syncMode.value,
-            pendingOpCount = pendingCount.value,
+        _uiState.value = build()
+    }
+
+    // Every flow read here is declared above `_uiState`, so all are initialised by the time
+    // its initialiser first calls this.
+    private fun build(): SettingsUiState {
+        val n = pendingCount.value
+        val online = connectivityChecker.isOnline()
+        val mode = syncMode.value
+        return SettingsUiState(
+            syncMode = mode,
+            pendingOpCount = n,
             deadLetterCount = deadLetterCount.value,
+            queueSummary = queueSummary(n, online, mode),
+            sendLabel = if (!online && n > 0) "Offline" else "Send",
+            sendEnabled = n > 0 && online,
+            syncModeHint = when (mode) {
+                SyncMode.INSTANT -> "Each entry goes on its own."
+                SyncMode.MANUAL -> "Nothing leaves until you tap Send."
+                SyncMode.SMART -> "$BATCH_FULL+ go together once you stop adding. Never held over an hour."
+            },
+            backupStatus = backupStatus(),
+            accountCount = accounts.value.size,
             showAmountsInAppSwitcher = showAmounts.value,
             requireBiometricToOpen = requireBiometric.value,
             signedInEmail = authRepository.currentEmail(),
@@ -164,25 +195,30 @@ class SettingsViewModel @Inject constructor(
             signingOut = signingOut,
             exporting = exporting,
             importing = importing,
-            showNightlyNudge = shouldShowNightlyNudge(now, hasEntries.value, lastBackupAt.value, nudgeSnoozedUntil.value),
         )
     }
 
-    private fun emptyUiState() = SettingsUiState(
-        syncMode = SyncMode.SMART,
-        pendingOpCount = 0,
-        deadLetterCount = 0,
-        showAmountsInAppSwitcher = false,
-        requireBiometricToOpen = false,
-        signedInEmail = null,
-        showSignOutGuard = false,
-        signingOut = false,
-        exporting = false,
-        importing = false,
-        showNightlyNudge = false,
-    )
+    // index.html's whenText().
+    private fun queueSummary(n: Int, online: Boolean, mode: SyncMode): String {
+        if (n == 0) return "Nothing waiting"
+        val count = if (n == 1) "1 entry" else "$n entries"
+        if (!online) return "$count · offline"
+        return when {
+            mode == SyncMode.MANUAL -> "$count · waiting for you"
+            mode == SyncMode.INSTANT -> "$count · retrying"
+            n >= BATCH_FULL -> "$count · going shortly"
+            else -> oldestPending.value
+                ?.plusSeconds(CEILING_SECONDS)
+                ?.atZone(ZoneId.systemDefault())
+                ?.let { "$count · by ${it.format(TIME)}" }
+                ?: "$count · waiting for company"
+        }
+    }
 
-    private companion object {
-        const val SNOOZE_SECONDS = 4 * 60 * 60L // 4 hours -- long enough to not nag again same night
+    private fun backupStatus(): String {
+        val n = entryCount.value
+        val count = if (n == 1) "1 entry" else "$n entries"
+        val last = lastBackupAt.value ?: return "$count · never backed up"
+        return "$count · ${last.atZone(ZoneId.systemDefault()).format(STAMP)}"
     }
 }

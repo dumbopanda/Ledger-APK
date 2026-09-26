@@ -20,7 +20,8 @@ sealed interface DateFieldHint {
     data class Error(val text: String) : DateFieldHint
 }
 
-private val WARNING_DATE_FORMAT = DateTimeFormatter.ofPattern("EEE d MMM yyyy", Locale.ENGLISH)
+// index.html's formatFullDate: en-GB, so September is "Sept" -- "Sat 27 Sept 2025".
+private val WARNING_DATE_FORMAT = DateTimeFormatter.ofPattern("EEE d MMM yyyy", Locale.UK)
 private const val DAYS_AGO_WARNING_THRESHOLD = 90
 
 fun computeDateFieldHint(dateState: DateFieldState, today: LocalDate): DateFieldHint = when (dateState) {

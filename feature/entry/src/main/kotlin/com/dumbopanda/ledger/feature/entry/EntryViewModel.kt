@@ -13,6 +13,7 @@ import com.dumbopanda.ledger.core.data.repository.HistoryRepository
 import com.dumbopanda.ledger.core.domain.AmountFieldValue
 import com.dumbopanda.ledger.core.domain.ApplySelfTransferToggleUseCase
 import com.dumbopanda.ledger.core.domain.DateFieldState
+import com.dumbopanda.ledger.core.domain.DraftField
 import com.dumbopanda.ledger.core.domain.EntryDraft
 import com.dumbopanda.ledger.core.domain.EntryDraftValidation
 import com.dumbopanda.ledger.core.domain.FormatAmountUseCase
@@ -21,11 +22,16 @@ import com.dumbopanda.ledger.core.domain.GroupOwedToMeUseCase
 import com.dumbopanda.ledger.core.domain.OwedToMeItem
 import com.dumbopanda.ledger.core.domain.ParseDateInputUseCase
 import com.dumbopanda.ledger.core.domain.ValidateEntryDraftUseCase
+import com.dumbopanda.ledger.core.domain.cleanToMinor
+import com.dumbopanda.ledger.core.domain.formatDisplayDate
+import com.dumbopanda.ledger.core.domain.formatMoney
+import com.dumbopanda.ledger.core.domain.formatMoneyFixed
 import com.dumbopanda.ledger.core.model.Account
 import com.dumbopanda.ledger.core.model.Entry
 import com.dumbopanda.ledger.core.model.Money
 import com.dumbopanda.ledger.core.model.TxnDirection
 import com.dumbopanda.ledger.core.model.TxnFrequency
+import com.dumbopanda.ledger.core.model.TxnId
 import com.dumbopanda.ledger.feature.entry.component.AccountSide
 import com.dumbopanda.ledger.feature.entry.component.TXN_TYPE_OPTIONS
 import com.dumbopanda.ledger.feature.entry.component.resolveAccountSwap
@@ -49,15 +55,21 @@ import javax.inject.Inject
 
 private val FULL_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
+// "The day is over when you go to bed, not when the clock rolls over. Until 05:30 an entry is
+// still being added to the day that has just finished" (index.html's DAY_STARTS_AT).
+private const val DAY_STARTS_AT_MINUTES = 5 * 60 + 30
+
+// Entry's own column limits -- typed input is clipped to these rather than crashing at save.
+private const val NAME_MAX = 120
+private const val NOTE_MAX = 300
+private const val TYPE_MAX = 60
+private const val AMOUNT_MAX_INT_DIGITS = 7
+
 /**
- * C1's screen assembly (§7.5) plus C4's edit mode (§7.6). Add and Edit are "the same form
- * doing both jobs" per §7.6's own words -- [draft]/[save] don't branch on a mode flag, they
- * branch on whether [editingOriginal] is set, which is exactly the "frozen at the moment
- * editing starts" rows §7.6 calls for.
- *
- * Edit is entered via [EditRequestStore] -- observed reactively (not just once at init), since
- * this ViewModel can outlive a single History->Edit round trip. See [EditRequestStore]'s own
- * doc for why a singleton store exists at all instead of a navigation argument.
+ * Add Payment, and edit mode -- "the same form does both jobs" -- behaving as index.html's form
+ * does: after a save the form resets (with a toast naming the id) rather than stopping on a
+ * "saved" screen; a blocked save toasts why and outlines the field in red; an edit, once saved,
+ * sends you back to History.
  */
 @HiltViewModel
 class EntryViewModel @Inject constructor(
@@ -74,40 +86,44 @@ class EntryViewModel @Inject constructor(
     private val clock: LedgerClock,
 ) : ViewModel() {
 
-    private fun today(): LocalDate = clock.now().atZone(ZoneId.systemDefault()).toLocalDate()
+    private fun now() = clock.now().atZone(ZoneId.systemDefault())
+    private fun today(): LocalDate = now().toLocalDate()
 
-    // The form's own state -- not derived from the reactive flows below, so a fresh accounts/
-    // openItems emission (another device syncing in, say) never clobbers what's being typed.
+    // The form's own state -- never derived from the reactive flows below, so another device
+    // syncing in never clobbers what's being typed.
     private var draft: EntryDraft? = null
     private var editingOriginal: EditingOriginal? = null
-    private var dateText: TextFieldValue = initialDateText()
-    private var showConfirmSheet = false
+    private var editBannerSub: String? = null
+    private var dateText = TextFieldValue("")
+    private var quickDate: QuickDate? = null
+    private var nameCustomMode = false
+    private var backOld = false
+    private var invalid: DraftField? = null
+    private var confirm: ConfirmSheetContent? = null
     private var saving = false
 
     private val accounts: StateFlow<List<Account>> = accountRepository.activeAccounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val openItems: StateFlow<List<OwedToMeItem>> = historyRepository.owedToMeEntries()
-        .map { entries -> groupOwedToMe.group(entries).filter { it.isOpen } }
+        .map { entries -> groupOwedToMe.group(entries).filter { it.isOpen }.sortedByDescending { it.openedDate } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val knownNames: StateFlow<List<String>> = historyRepository.expenseNamesByUse()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _uiState = MutableStateFlow<EntryUiState>(EntryUiState.Loading)
     val uiState: StateFlow<EntryUiState> = _uiState.asStateFlow()
 
-    // One-shot events (§7.6's "Edit cancelled — nothing changed" toast) -- not form state, so
-    // not part of EntryUiState, which the Route would otherwise re-show on every recomposition.
-    private val _events = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    val events: SharedFlow<String> = _events.asSharedFlow()
+    private val _events = MutableSharedFlow<EntryEvent>(extraBufferCapacity = 4)
+    val events: SharedFlow<EntryEvent> = _events.asSharedFlow()
 
     init {
-        // §7.12/C6's first-run seeding -- called here too (not just from AccountsViewModel),
-        // since Add Payment is this app's default tab and "Add an account first" would
-        // otherwise be a dead end for anyone who never visits Accounts. ensureSeeded's own
-        // transaction is the guard against double-seeding if both ViewModels call it.
+        // A safety net only -- AccountSetup (app module) is what normally creates accounts.
         viewModelScope.launch { accountRepository.ensureSeeded() }
         viewModelScope.launch {
-            combine(accounts, openItems, editRequestStore.request) { accs, items, edit -> Triple(accs, items, edit) }
-                .collect { (accs, items, edit) -> recompute(accs, items, edit) }
+            combine(accounts, openItems, knownNames, editRequestStore.request) { accs, _, _, edit -> accs to edit }
+                .collect { (accs, edit) -> recompute(accs, edit) }
         }
     }
 
@@ -117,41 +133,156 @@ class EntryViewModel @Inject constructor(
             return
         }
         val current = draft ?: return
-        draft = when (action) {
+        when (action) {
             is EntryAction.DateTextChanged -> {
                 dateText = action.value
-                val state = parseDateInput(action.value.text)
-                current.copy(resolvedDate = (state as? DateFieldState.Resolved)?.date)
+                quickDate = null
+                draft = current.copy(resolvedDate = resolvedDate(action.value.text))
+                clearInvalid(DraftField.DATE)
             }
-            is EntryAction.ExpenseNameChanged -> current.copy(expenseName = action.value)
-            is EntryAction.MoreInfoChanged -> current.copy(moreInfo = action.value.ifBlank { null })
-            is EntryAction.SelfTransferToggled ->
-                applySelfTransferToggle.apply(current, turningOn = action.on, accounts = accounts.value)
-            is EntryAction.AccountChanged -> applyAccountChange(current, action.account, side = AccountSide.FROM)
-            is EntryAction.ToAccountChanged -> applyAccountChange(current, action.account, side = AccountSide.TO)
-            is EntryAction.TxnTypeChanged -> current.copy(txnType = action.value)
-            is EntryAction.SentLegTypeChanged -> current.copy(sentLegType = action.value)
-            is EntryAction.ReceivedLegTypeChanged -> current.copy(receivedLegType = action.value)
-            is EntryAction.AmountKeystroke ->
-                current.copy(amount = amountFormatter.applyKeystroke(current.amount, action.rawText, action.rawCaret))
-            is EntryAction.DirectionChanged -> current.copy(direction = action.direction)
-            is EntryAction.TxnIdChanged -> current.copy(txnId = action.txnId)
-            EntryAction.SaveTapped -> {
-                if (validateEntryDraft.validate(current) == EntryDraftValidation.Valid) showConfirmSheet = true
-                current
+            EntryAction.DateBlurred -> {
+                val state = parseDateInput(dateText.text)
+                if (state is DateFieldState.Resolved) dateText = formatted(state.date)
             }
-            EntryAction.ConfirmDismissed -> {
-                showConfirmSheet = false
-                current
+            is EntryAction.DateQuickPicked -> {
+                val date = if (action.quick == QuickDate.TODAY) today() else today().minusDays(1)
+                dateText = formatted(date)
+                quickDate = action.quick
+                draft = current.copy(resolvedDate = date)
+                clearInvalid(DraftField.DATE)
             }
+            is EntryAction.ExpenseNameChosen -> {
+                nameCustomMode = false
+                draft = current.copy(expenseName = action.name)
+                clearInvalid(DraftField.NAME)
+            }
+            EntryAction.AddNewNameChosen -> {
+                nameCustomMode = true
+                draft = current.copy(expenseName = "")
+                clearInvalid(DraftField.NAME)
+            }
+            is EntryAction.ExpenseNameTyped -> {
+                draft = current.copy(expenseName = action.value.take(NAME_MAX))
+                clearInvalid(DraftField.NAME)
+            }
+            is EntryAction.MoreInfoChanged -> draft = current.copy(moreInfo = action.value.take(NOTE_MAX).ifEmpty { null })
+            is EntryAction.SelfTransferToggled -> {
+                val next = applySelfTransferToggle.apply(current, turningOn = action.on, accounts = accounts.value)
+                draft = next
+                nameCustomMode = isCustomName(next.expenseName)
+            }
+            is EntryAction.AccountChanged -> draft = applyAccountChange(current, action.account, AccountSide.FROM)
+            is EntryAction.ToAccountChanged -> draft = applyAccountChange(current, action.account, AccountSide.TO)
+            is EntryAction.TxnTypeChanged -> draft = current.copy(txnType = action.value.take(TYPE_MAX))
+            is EntryAction.SentLegTypeChanged -> draft = current.copy(sentLegType = action.value.take(TYPE_MAX))
+            is EntryAction.ReceivedLegTypeChanged -> draft = current.copy(receivedLegType = action.value.take(TYPE_MAX))
+            is EntryAction.AmountKeystroke -> {
+                val next = amountFormatter.applyKeystroke(current.amount, action.rawText, action.rawCaret)
+                if (next == current.amount && overflowsAmount(action.rawText)) {
+                    _events.tryEmit(EntryEvent.Toast("Amounts stop at ₹99,99,999"))
+                }
+                draft = current.copy(amount = next)
+                clearInvalid(DraftField.AMOUNT)
+            }
+            EntryAction.AmountBlurred -> draft = current.copy(amount = padDecimals(current.amount))
+            is EntryAction.DirectionChanged -> if (!current.selfTransfer) draft = current.copy(direction = action.direction)
+            is EntryAction.BackChanged -> draft = applyBack(current, action.yes)
+            is EntryAction.BackKindChanged -> {
+                backOld = action.old
+                if (current.txnId.isY) draft = applyBackKind(current)
+            }
+            is EntryAction.OpenItemChosen -> draft = adoptOpenItem(current, action.txnId)
+            EntryAction.SaveTapped -> onSaveTapped(current)
+            EntryAction.ConfirmDismissed -> confirm = null
             EntryAction.ConfirmConfirmed -> {
-                showConfirmSheet = false
+                confirm = null
                 save(current)
-                current
             }
-            EntryAction.CancelEdit -> current // unreachable, handled above
+            EntryAction.CancelEdit -> Unit // handled above
         }
         publish()
+    }
+
+    private fun recompute(accs: List<Account>, edit: EditRequest?) {
+        if (accs.isEmpty()) {
+            _uiState.value = EntryUiState.NoAccounts
+            return
+        }
+        if (edit != null) {
+            // Tapping Edit always opens the edit form, discarding whatever was mid-typed.
+            beginEdit(edit, accs)
+            editRequestStore.consume()
+        } else if (draft == null) {
+            resetForm(accs)
+        }
+        publish()
+    }
+
+    private fun beginEdit(edit: EditRequest, accs: List<Account>) {
+        val result = buildEditDraft(edit.entry, edit.sibling, accs)
+        draft = result.draft
+        editingOriginal = result.original
+        dateText = formatted(result.draft.resolvedDate ?: today())
+        quickDate = null
+        nameCustomMode = isCustomName(result.draft.expenseName)
+        backOld = false
+        invalid = null
+        confirm = null
+        editBannerSub = "${edit.entry.txnId.value} · ${formatDisplayDate(edit.entry.entryDate)} · ₹${formatMoney(edit.entry.amount.minor)}"
+    }
+
+    // index.html's fullReset(): the default date (by the 05:30 rule), the first account, No.
+    private fun resetForm(accs: List<Account>) {
+        val n = now()
+        val beforeDayStarts = n.hour * 60 + n.minute < DAY_STARTS_AT_MINUTES
+        val date = if (beforeDayStarts) n.toLocalDate().minusDays(1) else n.toLocalDate()
+        draft = EntryDraft(
+            resolvedDate = date,
+            expenseName = "",
+            moreInfo = null,
+            selfTransfer = false,
+            accountId = accs.first().id,
+            toAccountId = accs.getOrElse(1) { accs.first() }.id,
+            txnId = generateTxnId.generate(isY = false),
+            txnType = TXN_TYPE_OPTIONS.first(),
+            sentLegType = "Sent Transfer",
+            receivedLegType = "Received Transfer",
+            amount = AmountFieldValue("", 0),
+            direction = TxnDirection.Debit,
+            editModeOriginalIsTransfer = null,
+        )
+        dateText = formatted(date)
+        quickDate = if (beforeDayStarts) QuickDate.YESTERDAY else QuickDate.TODAY
+        editingOriginal = null
+        editBannerSub = null
+        nameCustomMode = false
+        backOld = false
+        invalid = null
+        confirm = null
+    }
+
+    private fun cancelEdit() {
+        if (editingOriginal == null) return
+        resetForm(accounts.value.ifEmpty { return })
+        publish()
+        _events.tryEmit(EntryEvent.Toast("Edit cancelled — nothing changed"))
+    }
+
+    private fun onSaveTapped(current: EntryDraft) {
+        when (val validation = validateEntryDraft.validate(current)) {
+            is EntryDraftValidation.Blocked -> {
+                invalid = validation.field
+                // The shape-lock message is long -- the web holds it on screen longer.
+                _events.tryEmit(EntryEvent.Toast(validation.message, if (validation.field == null) 4600L else 2200L))
+                validation.field?.let { _events.tryEmit(EntryEvent.FocusField(it)) }
+            }
+            EntryDraftValidation.Valid -> {
+                val accs = accounts.value
+                val account = accs.find { it.id == current.accountId } ?: return
+                val toAccount = accs.find { it.id == current.toAccountId } ?: account
+                confirm = buildConfirmSheet(current, account, toAccount, backOld && current.txnId.isY, isEditing = editingOriginal != null)
+            }
+        }
     }
 
     private fun applyAccountChange(draft: EntryDraft, changed: Account, side: AccountSide): EntryDraft {
@@ -164,101 +295,63 @@ class EntryViewModel @Inject constructor(
         return draft.copy(accountId = newFrom.id, toAccountId = newTo.id)
     }
 
-    private fun recompute(accs: List<Account>, items: List<OwedToMeItem>, edit: EditRequest?) {
-        if (accs.isEmpty()) {
-            _uiState.value = EntryUiState.NoAccounts
-            return
-        }
-        if (edit != null) {
-            // Tapping Edit always opens the edit form, discarding whatever was mid-typed in
-            // Add -- the whole screen just swapped jobs, same as §7.6 describes.
-            val result = buildEditDraft(edit.entry, edit.sibling, accs)
-            draft = result.draft
-            editingOriginal = result.original
-            dateText = dateTextFor(result.draft.resolvedDate)
-            showConfirmSheet = false
-            editRequestStore.consume()
-        } else if (draft == null) {
-            draft = buildAddDraft(accs)
-        }
-        publish()
+    // setBack(): No mints a fresh N; Yes applies whatever "Which one" says.
+    private fun applyBack(draft: EntryDraft, yes: Boolean): EntryDraft {
+        if (yes == draft.txnId.isY) return draft
+        if (!yes) return draft.copy(txnId = generateTxnId.generate(isY = false))
+        return applyBackKind(draft.copy(txnId = generateTxnId.generate(isY = true)))
     }
 
-    private fun buildAddDraft(accs: List<Account>) = EntryDraft(
-        resolvedDate = today(),
-        expenseName = "",
-        moreInfo = null,
-        selfTransfer = false,
-        accountId = accs.first().id,
-        toAccountId = accs.getOrElse(1) { accs.first() }.id,
-        txnId = generateTxnId.generate(isY = false),
-        txnType = TXN_TYPE_OPTIONS.first(),
-        sentLegType = "Sent Transfer",
-        receivedLegType = "Received Transfer",
-        amount = AmountFieldValue("", 0),
-        direction = TxnDirection.Debit,
-        editModeOriginalIsTransfer = null,
-    )
-
-    private fun cancelEdit() {
-        if (editingOriginal == null) return // Cancel only means something mid-edit
-        draft = null
-        editingOriginal = null
-        showConfirmSheet = false
-        dateText = initialDateText()
-        recompute(accounts.value, openItems.value, edit = null)
-        _events.tryEmit("Edit cancelled — nothing changed")
+    // applyBackMode(): New mints a fresh Y; Old adopts the first open item (or, with nothing
+    // open, falls back to a fresh Y).
+    private fun applyBackKind(draft: EntryDraft): EntryDraft {
+        if (!backOld) return draft.copy(txnId = generateTxnId.generate(isY = true))
+        val first = openItems.value.firstOrNull() ?: return draft.copy(txnId = generateTxnId.generate(isY = true))
+        return adoptOpenItem(draft, first.txnId)
     }
 
-    private fun publish() {
-        val d = draft ?: return
-        val validation = validateEntryDraft.validate(d)
-        val accs = accounts.value
-        val account = accs.find { it.id == d.accountId } ?: accs.firstOrNull()
-        val toAccount = accs.find { it.id == d.toAccountId } ?: account
-        val sentence = if (validation == EntryDraftValidation.Valid && account != null && toAccount != null) {
-            buildConfirmSentence(d.amount, d.direction, requireNotNull(d.resolvedDate), d.expenseName, account, d.selfTransfer, toAccount)
-        } else {
-            ""
+    // applyOpenItem(): reuse the item's id, and borrow its name if none is picked yet.
+    private fun adoptOpenItem(draft: EntryDraft, txnId: TxnId): EntryDraft {
+        val item = openItems.value.find { it.txnId == txnId }
+        if (draft.expenseName.isBlank() && item != null) {
+            nameCustomMode = isCustomName(item.expenseName)
+            return draft.copy(txnId = txnId, expenseName = item.expenseName)
         }
-        _uiState.value = EntryUiState.Ready(
-            draft = d,
-            dateText = dateText,
-            dateFieldState = parseDateInput(dateText.text),
-            accounts = accs,
-            openItems = openItems.value,
-            blockedMessage = (validation as? EntryDraftValidation.Blocked)?.message,
-            showConfirmSheet = showConfirmSheet,
-            confirmSentence = sentence,
-            saving = saving,
-            isEditing = editingOriginal != null,
-        )
+        return draft.copy(txnId = txnId)
     }
 
-    private fun save(draft: EntryDraft) {
-        val date = draft.resolvedDate ?: return
-        val minor = parseMinorAmount(draft.amount.clean) ?: return
+    private fun save(current: EntryDraft) {
+        val date = current.resolvedDate ?: return
+        val minor = cleanToMinor(current.amount.clean) ?: return
         val original = editingOriginal
+        val cleaned = current.copy(
+            expenseName = current.expenseName.trim(),
+            moreInfo = current.moreInfo?.trim()?.ifEmpty { null },
+            // A "Custom…" left blank is saved as "Custom", exactly as the web does.
+            txnType = current.txnType.trim().ifEmpty { "Custom" },
+            sentLegType = current.sentLegType.trim().ifEmpty { "Custom" },
+            receivedLegType = current.receivedLegType.trim().ifEmpty { "Custom" },
+        )
         saving = true
         publish()
         viewModelScope.launch {
-            if (original == null) {
-                saveNew(draft, date, minor)
-            } else {
-                saveEdit(draft, date, minor, original)
-            }
+            if (original == null) saveNew(cleaned, date, minor) else saveEdit(cleaned, date, minor, original)
             saving = false
-            this@EntryViewModel.draft = null
-            this@EntryViewModel.editingOriginal = null
-            dateText = initialDateText()
-            _uiState.value = EntryUiState.Saved
+            val id = cleaned.txnId.value
+            if (original == null) {
+                _events.tryEmit(EntryEvent.Toast(if (cleaned.selfTransfer) "Transfer added · $id" else "Added · $id"))
+            } else {
+                _events.tryEmit(EntryEvent.Toast("Updated"))
+                _events.tryEmit(EntryEvent.EditSaved)
+            }
+            accounts.value.takeIf { it.isNotEmpty() }?.let(::resetForm)
+            publish()
         }
     }
 
     private suspend fun saveNew(draft: EntryDraft, date: LocalDate, minor: Long) {
         val createdAt = clock.now()
         if (draft.selfTransfer) {
-            val transferGroup = UUID.randomUUID().toString()
             val sent = Entry(
                 id = UUID.randomUUID().toString(),
                 clientUid = UUID.randomUUID().toString(),
@@ -271,7 +364,7 @@ class EntryViewModel @Inject constructor(
                 txnFreq = TxnFrequency.Monthly,
                 amount = Money(minor),
                 direction = TxnDirection.Debit,
-                transferGroup = transferGroup,
+                transferGroup = UUID.randomUUID().toString(),
                 createdAt = createdAt,
             )
             val received = sent.copy(
@@ -351,22 +444,65 @@ class EntryViewModel @Inject constructor(
         }
     }
 
-    private fun initialDateText(): TextFieldValue = dateTextFor(null)
+    private fun publish() {
+        val d = draft ?: return
+        val minor = cleanToMinor(d.amount.clean) ?: 0L
+        val verb = if (editingOriginal != null) "Save Changes" else "Add Entry"
+        val cta = when {
+            minor <= 0L -> verb
+            d.selfTransfer -> "$verb • ₹${formatMoneyFixed(minor)} Transfer"
+            else -> "$verb • ₹${formatMoneyFixed(minor)} ${if (d.direction == TxnDirection.Debit) "Out" else "In"}"
+        }
+        _uiState.value = EntryUiState.Ready(
+            draft = d,
+            dateText = dateText,
+            dateFieldState = parseDateInput(dateText.text),
+            quickDate = quickDate,
+            accounts = accounts.value,
+            knownNames = knownNames.value,
+            nameCustomMode = nameCustomMode,
+            openItems = openItems.value,
+            backOld = backOld,
+            invalid = invalid,
+            caption = validateEntryDraft.missingCaption(d),
+            ctaText = cta,
+            confirm = confirm,
+            saving = saving,
+            isEditing = editingOriginal != null,
+            editBannerSub = editBannerSub,
+        )
+    }
 
-    private fun dateTextFor(date: LocalDate?): TextFieldValue {
-        val text = (date ?: today()).format(FULL_DATE_FORMAT)
+    private fun clearInvalid(field: DraftField) {
+        if (invalid == field) invalid = null
+    }
+
+    private fun isCustomName(name: String): Boolean = name.isNotEmpty() && name !in knownNames.value
+
+    private fun resolvedDate(text: String): LocalDate? = (parseDateInput(text) as? DateFieldState.Resolved)?.date
+
+    private fun formatted(date: LocalDate): TextFieldValue {
+        val text = date.format(FULL_DATE_FORMAT)
         return TextFieldValue(text, TextRange(text.length))
     }
 }
 
-// "500" -> 50000L (paise), "500.5" -> 50050L. Every clean string reaching here already passed
-// ValidateEntryDraftUseCase's isPositive check, so it is well-formed by construction.
-private fun parseMinorAmount(clean: String): Long? {
-    if (clean.isBlank()) return null
-    val dotIndex = clean.indexOf('.')
-    val integerPart = if (dotIndex == -1) clean else clean.substring(0, dotIndex)
-    val decimalPart = if (dotIndex == -1) "" else clean.substring(dotIndex + 1).padEnd(2, '0').take(2)
-    val rupees = integerPart.ifEmpty { "0" }.toLongOrNull() ?: return null
-    val paise = decimalPart.ifEmpty { "0" }.toLongOrNull() ?: return null
-    return rupees * 100 + paise
+// The keystroke was refused because the whole-rupee part ran past 7 digits (₹99,99,999).
+private fun overflowsAmount(raw: String): Boolean {
+    val clean = raw.filter { it.isDigit() || it == '.' }
+    return clean.substringBefore('.').trimStart('0').length > AMOUNT_MAX_INT_DIGITS
+}
+
+// The amount field's blur: "450" -> "450.00", "450.5" -> "450.50", ".5" -> "0.50".
+private fun padDecimals(amount: AmountFieldValue): AmountFieldValue {
+    val clean = amount.clean
+    if (clean.isEmpty()) return amount
+    val padded = if ('.' in clean) {
+        val whole = clean.substringBefore('.').ifEmpty { "0" }
+        val frac = (clean.substringAfter('.') + "00").take(2)
+        "$whole.$frac"
+    } else {
+        "$clean.00"
+    }
+    return AmountFieldValue(padded, padded.length)
 }

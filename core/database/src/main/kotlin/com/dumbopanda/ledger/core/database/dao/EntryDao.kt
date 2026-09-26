@@ -31,6 +31,33 @@ interface EntryDao {
     )
     fun pagingSource(): PagingSource<Int, EntryEntity>
 
+    // History and Stats both look at one month at a time (the shared month toggle) -- newest
+    // day first, newest entry first within a day, same order as pagingSource().
+    @Query(
+        """SELECT * FROM entries WHERE deletedAt IS NULL AND entryDate BETWEEN :from AND :to
+           ORDER BY entryDate DESC, createdAt DESC""",
+    )
+    fun observeBetween(from: LocalDate, to: LocalDate): Flow<List<EntryEntity>>
+
+    // Add Payment's transaction-name list: "every name that appears in anything this device
+    // knows about is an option, ordered by how often it has been used" (index.html). GROUP BY
+    // is case-sensitive, so "Rapido" and "rapido" stay two names -- which is exactly why the
+    // form makes you pick rather than type.
+    @Query(
+        """SELECT expenseName AS name, COUNT(*) AS uses FROM entries WHERE deletedAt IS NULL
+           GROUP BY expenseName ORDER BY uses DESC, expenseName COLLATE NOCASE""",
+    )
+    fun observeNameUses(): Flow<List<NameUseRow>>
+
+    // Stats' per-account "current balance" as of the end of the month being looked at: every
+    // credit less every debit up to that day. A self transfer debits one account and credits
+    // the other, so it nets out across accounts without being special-cased.
+    @Query(
+        """SELECT accountId, SUM(CASE WHEN direction='credit' THEN amountMinor ELSE -amountMinor END) AS balanceMinor
+           FROM entries WHERE deletedAt IS NULL AND entryDate <= :to GROUP BY accountId""",
+    )
+    fun observeBalancesUpTo(to: LocalDate): Flow<List<AccountBalanceRow>>
+
     // The prototype's odd-count-live rule (§2), moved off the main thread and made reactive.
     @Query(
         """SELECT txnId FROM entries WHERE deletedAt IS NULL AND txnId LIKE 'Y%'
@@ -107,4 +134,8 @@ interface EntryDao {
     // full paged list just to know whether it's non-empty.
     @Query("""SELECT EXISTS(SELECT 1 FROM entries WHERE deletedAt IS NULL)""")
     fun hasAnyLiveEntries(): Flow<Boolean>
+
+    // Settings' Backup line: "5 entries · never backed up".
+    @Query("""SELECT COUNT(*) FROM entries WHERE deletedAt IS NULL""")
+    fun observeLiveCount(): Flow<Int>
 }

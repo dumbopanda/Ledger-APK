@@ -32,4 +32,12 @@ interface PendingOpDao {
 
     @Query("SELECT COUNT(*) FROM pending_ops")
     fun observeCount(): Flow<Int>
+
+    @Query("SELECT entityClientUid AS clientUid, op FROM pending_ops WHERE entityType = 'entry'")
+    fun observeEntryOps(): Flow<List<PendingEntryOpRow>>
+
+    // When the oldest waiting op was queued -- Batched mode never holds anything past an hour
+    // from this, which is the "by 02:15" in Settings' "Waiting to be sent" line.
+    @Query("SELECT MIN(createdAt) FROM pending_ops")
+    fun observeOldestCreatedAt(): Flow<java.time.Instant?>
 }

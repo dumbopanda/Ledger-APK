@@ -37,6 +37,36 @@ val MutedOnDark = Color(0xFF9EAD9C)
 // band, distinct from Coral (the light-surface error/expense color).
 val NetOutOnDark = Color(0xFFFF9B9B)
 
+// The web front end's remaining one-off inks and fills, named for where index.html uses them.
+val HintGrey = Color(0xFF6B6861) // .field-hint
+val ChevronInk = Color(0xFF78756E) // the select/combo arrow's own stroke
+val AmberInk = Color(0xFF8A6D1F) // .amt-note, .sheet-note, .date-hint.is-warn, .eb-sub
+val AmberDeepInk = Color(0xFF6E571A) // .eb-title, .tag.held, .tag.acct-International
+val UpdateInk = Color(0xFF5A4708) // .update-label
+val MintInk = Color(0xFF14614A) // .tag.acct
+val CashFill = Color(0xFFEAE5D8) // .tile.acct-Cash
+val CashInk = Color(0xFF6B6045) // .tag.acct-Cash
+val EditedFill = Color(0xFFFFE9C9) // .tag.edited
+val EditedInk = Color(0xFF8A5A0F)
+val SwitchOff = Color(0xFFD8D5CB) // .slider (off)
+val CountOnDark = Color(0xFF2C312E) // .sub-tab.active .count
+
+/**
+ * The web tints tiles/tags/dots by account NAME (Domestic mint, International amber, Cash
+ * stone). The APK has N user-named accounts, so the same three tones are handed out by the
+ * account's position instead -- the default Domestic/International/Cash order lands on
+ * exactly the web's colours, and a 4th account onward cycles.
+ */
+data class AccountTone(val fill: Color, val ink: Color)
+
+private val AccountTones = listOf(
+    AccountTone(Mint, MintInk),
+    AccountTone(Amber, AmberDeepInk),
+    AccountTone(CashFill, CashInk),
+)
+
+fun accountTone(position: Int): AccountTone = AccountTones[position.mod(AccountTones.size)]
+
 // Light theme only at launch (§6.3) — no dark surface ramp is specified, and a
 // half-done dark mode on a finance app reads as broken.
 val LedgerColorScheme: ColorScheme = lightColorScheme(
