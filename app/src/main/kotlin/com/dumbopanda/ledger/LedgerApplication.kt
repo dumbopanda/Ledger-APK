@@ -24,7 +24,6 @@ class LedgerApplication : Application(), Configuration.Provider {
         SentryAndroid.init(this) { options ->
             options.dsn = BuildConfig.SENTRY_DSN
             options.isSendDefaultPii = false
-            options.tracesSampleRate = 0.0
             options.beforeSend = io.sentry.SentryOptions.BeforeSendCallback { event, _ ->
                 event.removeExtra("amount")
                 event.removeExtra("expenseName")
