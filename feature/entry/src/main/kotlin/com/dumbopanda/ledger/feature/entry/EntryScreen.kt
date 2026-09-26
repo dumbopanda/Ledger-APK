@@ -130,81 +130,91 @@ private fun EntryForm(state: EntryUiState.Ready, onAction: (EntryAction) -> Unit
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         )
 
-        SelfTransferToggle(
-            checked = draft.selfTransfer,
-            onCheckedChange = { onAction(EntryAction.SelfTransferToggled(it)) },
-            modifier = Modifier.padding(top = 16.dp),
-        )
-
-        if (draft.selfTransfer) {
-            TransferAccountChips(
-                accounts = state.accounts,
-                from = account,
-                to = toAccount,
-                onChange = { from, to ->
-                    onAction(EntryAction.AccountChanged(from))
-                    onAction(EntryAction.ToAccountChanged(to))
-                },
-                modifier = Modifier.padding(top = 12.dp),
+        // "Which account" -- the web's second top-level card, .group.account-group.
+        LedgerCard(modifier = Modifier.padding(top = 14.dp)) {
+            Text("Which account", style = MaterialTheme.typography.titleMedium)
+            SelfTransferToggle(
+                checked = draft.selfTransfer,
+                onCheckedChange = { onAction(EntryAction.SelfTransferToggled(it)) },
+                modifier = Modifier.padding(top = 14.dp),
             )
-        } else {
-            AccountChips(
-                accounts = state.accounts,
-                selected = account,
-                onSelect = { onAction(EntryAction.AccountChanged(it)) },
-                modifier = Modifier.padding(top = 12.dp),
-            )
+            if (draft.selfTransfer) {
+                TransferAccountChips(
+                    accounts = state.accounts,
+                    from = account,
+                    to = toAccount,
+                    onChange = { from, to ->
+                        onAction(EntryAction.AccountChanged(from))
+                        onAction(EntryAction.ToAccountChanged(to))
+                    },
+                    modifier = Modifier.padding(top = 14.dp),
+                )
+            } else {
+                AccountChips(
+                    accounts = state.accounts,
+                    selected = account,
+                    onSelect = { onAction(EntryAction.AccountChanged(it)) },
+                    modifier = Modifier.padding(top = 14.dp),
+                )
+            }
         }
 
-        if (draft.selfTransfer) {
-            TxnTypeCombo(
-                selectedType = draft.sentLegType,
-                onTypeChange = { onAction(EntryAction.SentLegTypeChanged(it)) },
-                label = "Sent leg type",
-                modifier = Modifier.padding(top = 16.dp),
+        // "What it was" -- name, note, date, category (split into two legs on self transfer).
+        LedgerCard(modifier = Modifier.padding(top = 14.dp)) {
+            Text("What it was", style = MaterialTheme.typography.titleMedium)
+
+            LedgerTextField(
+                value = draft.expenseName,
+                onValueChange = { onAction(EntryAction.ExpenseNameChanged(it)) },
+                label = "Transaction name",
+                modifier = Modifier.padding(top = 14.dp),
             )
-            TxnTypeCombo(
-                selectedType = draft.receivedLegType,
-                onTypeChange = { onAction(EntryAction.ReceivedLegTypeChanged(it)) },
-                label = "Received leg type",
+
+            LedgerTextField(
+                value = draft.moreInfo.orEmpty(),
+                onValueChange = { onAction(EntryAction.MoreInfoChanged(it)) },
+                label = "Note (optional)",
                 modifier = Modifier.padding(top = 12.dp),
             )
-        } else {
-            TxnTypeCombo(
-                selectedType = draft.txnType,
-                onTypeChange = { onAction(EntryAction.TxnTypeChanged(it)) },
-                modifier = Modifier.padding(top = 16.dp),
+
+            DateField(
+                value = state.dateText,
+                onValueChange = { onAction(EntryAction.DateTextChanged(it)) },
+                dateState = state.dateFieldState,
+                modifier = Modifier.padding(top = 12.dp),
             )
+
+            if (draft.selfTransfer) {
+                TxnTypeCombo(
+                    selectedType = draft.sentLegType,
+                    onTypeChange = { onAction(EntryAction.SentLegTypeChanged(it)) },
+                    label = "Sent leg type",
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+                TxnTypeCombo(
+                    selectedType = draft.receivedLegType,
+                    onTypeChange = { onAction(EntryAction.ReceivedLegTypeChanged(it)) },
+                    label = "Received leg type",
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            } else {
+                TxnTypeCombo(
+                    selectedType = draft.txnType,
+                    onTypeChange = { onAction(EntryAction.TxnTypeChanged(it)) },
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+            }
         }
 
-        LedgerTextField(
-            value = draft.expenseName,
-            onValueChange = { onAction(EntryAction.ExpenseNameChanged(it)) },
-            label = "Transaction name",
-            modifier = Modifier.padding(top = 16.dp),
-        )
-
-        LedgerTextField(
-            value = draft.moreInfo.orEmpty(),
-            onValueChange = { onAction(EntryAction.MoreInfoChanged(it)) },
-            label = "Note (optional)",
-            modifier = Modifier.padding(top = 12.dp),
-        )
-
-        DateField(
-            value = state.dateText,
-            onValueChange = { onAction(EntryAction.DateTextChanged(it)) },
-            dateState = state.dateFieldState,
-            modifier = Modifier.padding(top = 16.dp),
-        )
-
+        // "Will I get this back?" -- hidden entirely on self transfer, whose Y id is automatic.
         if (!draft.selfTransfer) {
-            WillGetBackField(
-                txnId = draft.txnId,
-                openItems = state.openItems,
-                onTxnIdChange = { onAction(EntryAction.TxnIdChanged(it)) },
-                modifier = Modifier.padding(top = 16.dp),
-            )
+            LedgerCard(modifier = Modifier.padding(top = 14.dp)) {
+                WillGetBackField(
+                    txnId = draft.txnId,
+                    openItems = state.openItems,
+                    onTxnIdChange = { onAction(EntryAction.TxnIdChanged(it)) },
+                )
+            }
         }
 
         LedgerPillButton(

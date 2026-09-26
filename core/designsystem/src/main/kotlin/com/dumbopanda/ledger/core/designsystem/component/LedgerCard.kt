@@ -1,5 +1,6 @@
 package com.dumbopanda.ledger.core.designsystem.component
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +26,11 @@ fun LedgerCard(
     Card(
         shape = LedgerShapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        // .group/.amount-card/.panel/.stat-tile are all flat with a 1px border, not a
+        // shadow -- only .ledger-card (History's day cards) gets elevation, and that's
+        // built separately rather than by every caller of this shared card.
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)

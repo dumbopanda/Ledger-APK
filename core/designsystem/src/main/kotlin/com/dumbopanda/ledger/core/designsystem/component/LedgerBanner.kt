@@ -17,6 +17,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.dumbopanda.ledger.core.designsystem.Amber
 import com.dumbopanda.ledger.core.designsystem.Coral
+import com.dumbopanda.ledger.core.designsystem.LedgerShapes
 import com.dumbopanda.ledger.core.designsystem.LedgerTheme
 import com.dumbopanda.ledger.core.designsystem.Mint
 import com.dumbopanda.ledger.core.designsystem.TextDark
@@ -40,7 +41,8 @@ fun LedgerBanner(
     }
     val content = if (tone == LedgerBannerTone.Error) MaterialTheme.colorScheme.onError else TextDark
 
-    Surface(color = background, contentColor = content, modifier = modifier.fillMaxWidth()) {
+    // .update-bar/.backup-bar/.sync-bar all round to --radius-input.
+    Surface(shape = LedgerShapes.extraSmall, color = background, contentColor = content, modifier = modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),

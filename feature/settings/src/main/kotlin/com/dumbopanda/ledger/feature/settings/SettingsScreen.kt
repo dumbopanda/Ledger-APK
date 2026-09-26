@@ -35,8 +35,8 @@ import com.dumbopanda.ledger.core.designsystem.LedgerTheme
 import com.dumbopanda.ledger.core.designsystem.component.LedgerBanner
 import com.dumbopanda.ledger.core.designsystem.component.LedgerBannerTone
 import com.dumbopanda.ledger.core.designsystem.component.LedgerCard
+import com.dumbopanda.ledger.core.designsystem.component.LedgerChip
 import com.dumbopanda.ledger.core.designsystem.component.LedgerPillButton
-import com.dumbopanda.ledger.core.designsystem.component.LedgerSegmentedButton
 import com.dumbopanda.ledger.core.ui.openEmail
 import com.dumbopanda.ledger.core.ui.openUrl
 import java.time.LocalDate
@@ -115,19 +115,22 @@ private fun SectionTitle(text: String) {
 private fun SyncSection(uiState: SettingsUiState, onAction: (SettingsAction) -> Unit) {
     SectionTitle("Sync")
     LedgerCard {
-        LedgerSegmentedButton(
-            options = listOf(SyncMode.SMART, SyncMode.INSTANT, SyncMode.MANUAL),
-            selected = uiState.syncMode,
-            onSelect = { onAction(SettingsAction.SyncModeChanged(it)) },
-            label = {
-                when (it) {
-                    SyncMode.SMART -> "Together"
-                    SyncMode.INSTANT -> "Instantly"
-                    SyncMode.MANUAL -> "Manual"
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        // .seg-chips -- the same dark/lime "on" pill language as everything else, not
+        // Material's own segmented-button coloring.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(SyncMode.SMART, SyncMode.INSTANT, SyncMode.MANUAL).forEach { mode ->
+                LedgerChip(
+                    text = when (mode) {
+                        SyncMode.SMART -> "Together"
+                        SyncMode.INSTANT -> "Instantly"
+                        SyncMode.MANUAL -> "Manual"
+                    },
+                    selected = uiState.syncMode == mode,
+                    onClick = { onAction(SettingsAction.SyncModeChanged(mode)) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
         Text(
             text = syncModeDescription(uiState.syncMode),
             style = MaterialTheme.typography.bodySmall,

@@ -1,5 +1,6 @@
 package com.dumbopanda.ledger.feature.entry.component
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.dumbopanda.ledger.core.designsystem.LedgerTheme
-import com.dumbopanda.ledger.core.designsystem.component.LedgerSegmentedButton
+import com.dumbopanda.ledger.core.designsystem.component.LedgerChip
 import com.dumbopanda.ledger.core.designsystem.icon.LedgerIcons
 import com.dumbopanda.ledger.core.domain.FormatAmountUseCase
 import com.dumbopanda.ledger.core.domain.GenerateTxnIdUseCase
@@ -61,31 +62,35 @@ fun WillGetBackField(
     Column(modifier = modifier) {
         Text(
             text = "Will I get this back?",
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
+            style = MaterialTheme.typography.titleMedium,
         )
-        LedgerSegmentedButton(
-            options = listOf(false, true),
-            selected = txnId.isY,
-            onSelect = { willGetBack ->
-                if (willGetBack == txnId.isY) return@LedgerSegmentedButton
-                onTxnIdChange(generateTxnId.generate(isY = willGetBack))
-            },
-            label = { if (it) "Yes" else "No" },
-        )
+        Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            LedgerChip(
+                text = "Yes",
+                selected = txnId.isY,
+                onClick = { if (!txnId.isY) onTxnIdChange(generateTxnId.generate(isY = true)) },
+                modifier = Modifier.weight(1f),
+            )
+            LedgerChip(
+                text = "No",
+                selected = !txnId.isY,
+                onClick = { if (txnId.isY) onTxnIdChange(generateTxnId.generate(isY = false)) },
+                modifier = Modifier.weight(1f),
+            )
+        }
         if (txnId.isY) {
-            Row(modifier = Modifier.padding(top = 8.dp)) {
-                LedgerSegmentedButton(
-                    options = listOf(false, true),
+            Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                LedgerChip(
+                    text = "New",
+                    selected = !isOld,
+                    onClick = { onTxnIdChange(generateTxnId.generate(isY = true)) },
+                    modifier = Modifier.weight(1f),
+                )
+                LedgerChip(
+                    text = "Old",
                     selected = isOld,
-                    onSelect = { pickOld ->
-                        if (pickOld) {
-                            if (openItems.isNotEmpty()) oldPickerExpanded = true
-                        } else {
-                            onTxnIdChange(generateTxnId.generate(isY = true))
-                        }
-                    },
-                    label = { if (it) "Old" else "New" },
+                    onClick = { if (openItems.isNotEmpty()) oldPickerExpanded = true },
+                    modifier = Modifier.weight(1f),
                 )
             }
             if (current is TxnIdChoice.Existing) {

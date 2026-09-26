@@ -6,6 +6,10 @@ import androidx.compose.ui.graphics.Color
 
 val CanvasLight = Color(0xFFF4F1EA)
 val CanvasDark = Color(0xFF121614)
+// The page itself is cream (CanvasLight); every card floats a shade lighter on
+// top of it in true white -- "inside a card, white fields on a white surface
+// would vanish, so the fill and the page swap: cream controls on white."
+val White = Color(0xFFFFFFFF)
 val Forest = Color(0xFF0E7955)
 val Lime = Color(0xFFCCF244)
 val Mint = Color(0xFFDDF3E4)
@@ -20,6 +24,19 @@ val TextDark = Color(0xFF181C1A)
 val TextMuted = Color(0xFF5F5C56)
 val HairlineLt = Color(0xFFE5E3DB)
 
+// --border-strong: the heavier rule for when a border separates two whole objects
+// (a day card, a stat tile) rather than two rows inside one -- History's day cards
+// and Stats' tiles use this instead of the default hairline.
+val HairlineStrong = Color(0xFFD4D0C4)
+
+// .top-tab's own muted label color on the dark nav track -- distinct from TextMuted,
+// which is calibrated for muted text on the light/white surfaces instead.
+val MutedOnDark = Color(0xFF9EAD9C)
+
+// .day-head .net.out -- a soft coral for a negative day-total against the dark header
+// band, distinct from Coral (the light-surface error/expense color).
+val NetOutOnDark = Color(0xFFFF9B9B)
+
 // Light theme only at launch (§6.3) — no dark surface ramp is specified, and a
 // half-done dark mode on a finance app reads as broken.
 val LedgerColorScheme: ColorScheme = lightColorScheme(
@@ -33,9 +50,15 @@ val LedgerColorScheme: ColorScheme = lightColorScheme(
     onError = CanvasLight,
     background = CanvasLight,
     onBackground = TextDark,
-    surface = CanvasLight,
+    // Cards (.group/.amount-card/.panel/.stat-tile/.ledger-card) are white, distinct
+    // from the cream page -- NOT the same tone, or every card would blend invisibly
+    // into the background with only its 1px border for definition.
+    surface = White,
     onSurface = TextDark,
-    surfaceVariant = Mint,
+    // The recessed cream fill used for input-like elements sitting on a white card
+    // (.group input/select/.chip:not(.selected) etc.) -- this IS meant to equal the
+    // page background, unlike `surface` above.
+    surfaceVariant = CanvasLight,
     onSurfaceVariant = TextMuted,
     outline = HairlineLt,
     outlineVariant = HairlineLt,

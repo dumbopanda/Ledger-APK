@@ -18,21 +18,24 @@ private val InterProvider = GoogleFont.Provider(
     certificates = R.array.com_google_android_gms_fonts_certs,
 )
 
-private val Inter = GoogleFont("Inter")
+// The web front end's own font (index.html's Google Fonts <link>, weights 400-800).
+private val PlusJakartaSans = GoogleFont("Plus Jakarta Sans")
 
 @OptIn(ExperimentalTextApi::class)
 val LedgerFontFamily = FontFamily(
-    Font(googleFont = Inter, fontProvider = InterProvider, weight = FontWeight.Normal),
-    Font(googleFont = Inter, fontProvider = InterProvider, weight = FontWeight.Medium),
-    Font(googleFont = Inter, fontProvider = InterProvider, weight = FontWeight.SemiBold),
-    Font(googleFont = Inter, fontProvider = InterProvider, weight = FontWeight.Bold),
+    Font(googleFont = PlusJakartaSans, fontProvider = InterProvider, weight = FontWeight.Normal),
+    Font(googleFont = PlusJakartaSans, fontProvider = InterProvider, weight = FontWeight.Medium),
+    Font(googleFont = PlusJakartaSans, fontProvider = InterProvider, weight = FontWeight.SemiBold),
+    Font(googleFont = PlusJakartaSans, fontProvider = InterProvider, weight = FontWeight.Bold),
+    Font(googleFont = PlusJakartaSans, fontProvider = InterProvider, weight = FontWeight.ExtraBold),
 )
 
 val LedgerTypography = Typography(
     headlineLarge = TextStyle(fontFamily = LedgerFontFamily, fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 40.sp),
     headlineMedium = TextStyle(fontFamily = LedgerFontFamily, fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 36.sp),
-    titleLarge = TextStyle(fontFamily = LedgerFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp),
-    titleMedium = TextStyle(fontFamily = LedgerFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 24.sp),
+    // App title (.topbar h1: 22px/800) and section-card titles (.group-title: 16px/700).
+    titleLarge = TextStyle(fontFamily = LedgerFontFamily, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = (-0.3).sp),
+    titleMedium = TextStyle(fontFamily = LedgerFontFamily, fontWeight = FontWeight.Bold, fontSize = 16.sp, lineHeight = 22.sp, letterSpacing = (-0.2).sp),
     titleSmall = TextStyle(fontFamily = LedgerFontFamily, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
     bodyLarge = TextStyle(fontFamily = LedgerFontFamily, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp),
     bodyMedium = TextStyle(fontFamily = LedgerFontFamily, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),

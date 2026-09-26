@@ -8,9 +8,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import com.dumbopanda.ledger.core.designsystem.component.LedgerBanner
 import com.dumbopanda.ledger.core.designsystem.component.LedgerBannerTone
-import com.dumbopanda.ledger.core.designsystem.component.LedgerSegmentedButton
+import com.dumbopanda.ledger.core.designsystem.component.LedgerTopTabs
 import com.dumbopanda.ledger.feature.accounts.AccountsRoute
 import com.dumbopanda.ledger.feature.entry.EntryRoute
 import com.dumbopanda.ledger.feature.history.HistoryRoute
@@ -39,7 +41,7 @@ fun HomeScreen(
                 tone = LedgerBannerTone.Warning,
             )
         }
-        LedgerSegmentedButton(
+        LedgerTopTabs(
             options = listOf(HomeTab.ADD, HomeTab.HISTORY, HomeTab.ACCOUNTS, HomeTab.SETTINGS),
             selected = tab,
             onSelect = { tab = it },
@@ -51,6 +53,7 @@ fun HomeScreen(
                     HomeTab.SETTINGS -> "Settings"
                 }
             },
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
         )
         Column(Modifier.weight(1f)) {
             when (tab) {

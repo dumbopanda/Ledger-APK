@@ -1,5 +1,6 @@
 package com.dumbopanda.ledger.feature.history
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,13 +24,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.dumbopanda.ledger.core.designsystem.CanvasDark
+import com.dumbopanda.ledger.core.designsystem.HairlineStrong
+import com.dumbopanda.ledger.core.designsystem.Lime
+import com.dumbopanda.ledger.core.designsystem.LedgerShapes
+import com.dumbopanda.ledger.core.designsystem.MutedOnDark
+import com.dumbopanda.ledger.core.designsystem.NetOutOnDark
 import com.dumbopanda.ledger.core.designsystem.component.LedgerCard
-import com.dumbopanda.ledger.core.designsystem.component.LedgerSegmentedButton
+import com.dumbopanda.ledger.core.designsystem.component.LedgerSubTabs
 import com.dumbopanda.ledger.core.domain.DayGroup
 import com.dumbopanda.ledger.core.domain.FormatAmountUseCase
 import com.dumbopanda.ledger.core.domain.GroupEntriesByDayUseCase
@@ -83,7 +92,7 @@ internal fun HistoryScreen(
 ) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
-            LedgerSegmentedButton(
+            LedgerSubTabs(
                 options = listOf(HistoryTab.RECENT, HistoryTab.OWED_TO_ME),
                 selected = uiState.tab,
                 onSelect = { onAction(HistoryAction.TabSelected(it)) },
@@ -145,33 +154,60 @@ private fun SummaryTile(label: String, minor: Long, color: Color) {
     }
 }
 
+// .ledger-card + .day-head -- a day is one object, so it gets the heavier border-strong
+// rule and a dark header band (day label uppercase in lime, net amount colored by sign),
+// distinct from the plain white .group/.panel cards used elsewhere.
 @Composable
 private fun DayCard(group: DayGroup, accounts: Map<String, Account>, onAction: (HistoryAction) -> Unit) {
-    LedgerCard(modifier = Modifier.padding(bottom = 12.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(group.date.format(DAY_HEADER_FORMAT), style = MaterialTheme.typography.titleSmall)
-            Text(
-                "₹" + signedRupees(group.netMinor),
-                style = MaterialTheme.typography.titleSmall,
-                color = if (group.netMinor < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-            )
-        }
-        val rows = remember(group) { foldTransfers(group.entries) }
-        Column(Modifier.padding(top = 8.dp)) {
-            rows.forEach { row ->
-                when (row) {
-                    is HistoryRow.Single -> EntryRow(
-                        entry = row.entry,
-                        account = accounts[row.entry.accountId],
-                        onClick = { onAction(HistoryAction.EntryTapped(row.entry)) },
-                    )
-                    is HistoryRow.Transfer -> TransferRow(
-                        sent = row.sent,
-                        received = row.received,
-                        fromAccount = accounts[row.sent.accountId],
-                        toAccount = accounts[row.received.accountId],
-                        onClick = { onAction(HistoryAction.EntryTapped(row.sent)) },
-                    )
+    Surface(
+        shape = LedgerShapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, HairlineStrong),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(CanvasDark)
+                    .padding(horizontal = 18.dp, vertical = 13.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    group.date.format(DAY_HEADER_FORMAT).uppercase(Locale.ENGLISH),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.6.sp,
+                    color = Lime,
+                )
+                Text(
+                    "₹" + signedRupees(group.netMinor),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        group.netMinor < 0 -> NetOutOnDark
+                        group.netMinor > 0 -> Lime
+                        else -> MutedOnDark
+                    },
+                )
+            }
+            val rows = remember(group) { foldTransfers(group.entries) }
+            Column(Modifier.padding(16.dp)) {
+                rows.forEach { row ->
+                    when (row) {
+                        is HistoryRow.Single -> EntryRow(
+                            entry = row.entry,
+                            account = accounts[row.entry.accountId],
+                            onClick = { onAction(HistoryAction.EntryTapped(row.entry)) },
+                        )
+                        is HistoryRow.Transfer -> TransferRow(
+                            sent = row.sent,
+                            received = row.received,
+                            fromAccount = accounts[row.sent.accountId],
+                            toAccount = accounts[row.received.accountId],
+                            onClick = { onAction(HistoryAction.EntryTapped(row.sent)) },
+                        )
+                    }
                 }
             }
         }

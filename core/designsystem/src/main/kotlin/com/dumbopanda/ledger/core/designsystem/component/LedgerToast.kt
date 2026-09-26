@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,7 +24,8 @@ fun LedgerToast(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        // .toast's own border-radius is --radius-pill, not --radius-input.
+        shape = CircleShape,
         color = TextDark,
         contentColor = MaterialTheme.colorScheme.background,
         modifier = modifier
