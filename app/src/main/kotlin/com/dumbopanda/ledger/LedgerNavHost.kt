@@ -44,8 +44,16 @@ fun LedgerNavHost(bootRoute: BootRoute) {
         composable(LedgerDestinations.RESTORING) {
             BiometricGate {
                 RestoringRoute(
+                    onDone = { navController.navigate(LedgerDestinations.ACCOUNT_SETUP) { popUpTo(0) } },
+                    onContinueOffline = { navController.navigate(LedgerDestinations.ACCOUNT_SETUP) { popUpTo(0) } },
+                )
+            }
+        }
+
+        composable(LedgerDestinations.ACCOUNT_SETUP) {
+            BiometricGate {
+                AccountSetupRoute(
                     onDone = { navController.navigate(LedgerDestinations.HOME) { popUpTo(0) } },
-                    onContinueOffline = { navController.navigate(LedgerDestinations.HOME) { popUpTo(0) } },
                 )
             }
         }

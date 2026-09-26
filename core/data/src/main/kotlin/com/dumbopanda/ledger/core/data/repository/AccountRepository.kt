@@ -67,11 +67,19 @@ class AccountRepository @Inject constructor(
     }
 
     // §2 / §7.2: idempotent by construction (see the internal function's own doc) -- safe to
-    // call from more than one screen's ViewModel without coordinating who seeds first.
+    // call from more than one screen's ViewModel without coordinating who seeds first. A
+    // fallback safety net for reaching Add/Accounts with zero accounts by some other path --
+    // AccountSetupViewModel (app module) is what normally seeds a brand-new user now, with
+    // names the user actually typed rather than SEED_NAMES; this only fires if that step was
+    // somehow bypassed, so it never fights with what the user just set up.
     suspend fun ensureSeeded() {
         val seeded = ensureSeeded(sessionDatabaseHolder.database(), clock)
         if (seeded) notifySync()
     }
+
+    // AccountSetupViewModel's own gate: a returning user restored from the server already has
+    // accounts and skips straight past that screen; a brand-new user has none yet and sees it.
+    suspend fun hasAnyAccount(): Boolean = sessionDatabaseHolder.database().accountDao().countLive() > 0
 
     private suspend fun notifySync() {
         syncScheduler.onOpEnqueued(userPrefsRepository.currentSyncMode())
