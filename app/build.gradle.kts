@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.ledger.android.application)
     alias(libs.plugins.ledger.android.compose)
     alias(libs.plugins.ledger.android.hilt)
+    alias(libs.plugins.sentry.android.gradle)
 }
 
 // §11.2's upload key. Never generated or held by anything but the owner --
@@ -18,6 +19,14 @@ val keystoreProperties = Properties().apply {
 }
 val hasSigningConfig = keystoreProperties.containsKey("storeFile")
 
+// C12's crash-reporting DSN. Same footing as the Supabase publishable key
+// (core/network/build.gradle.kts) -- safe to embed client-side, kept out of
+// source only so prod/local can swap without a code change.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use(::load)
+}
+
 android {
     namespace = "com.dumbopanda.ledger"
 
@@ -25,6 +34,7 @@ android {
         applicationId = "com.dumbopanda.ledger"
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField("String", "SENTRY_DSN", "\"${localProperties.getProperty("sentry.dsn", "")}\"")
     }
 
     buildFeatures {
@@ -46,6 +56,19 @@ android {
             }
         }
     }
+}
+
+// mapping.txt upload (readable crash stack traces) needs a Sentry auth
+// token -- a real secret, unlike the DSN above, so it lives in its own
+// gitignored sentry.properties (same keystore.properties pattern) rather
+// than local.properties. Absent entirely on a machine that hasn't set this
+// up yet -- release builds there are simply unsymbolicated, not broken.
+val hasSentryAuthToken = rootProject.file("sentry.properties").exists()
+sentry {
+    autoUploadProguardMapping = hasSentryAuthToken
+    includeProguardMapping = hasSentryAuthToken
+    tracingInstrumentation.enabled = false
+    autoInstallation.enabled = false
 }
 
 dependencies {
@@ -70,4 +93,5 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.androidx.biometric)
+    implementation(libs.sentry.android)
 }

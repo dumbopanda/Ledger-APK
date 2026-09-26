@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.room) apply false
+    alias(libs.plugins.sentry.android.gradle) apply false
 }
 
 // Ktor's OkHttp engine pulls okhttp-android 5.x, which gates on compileSdk 37+

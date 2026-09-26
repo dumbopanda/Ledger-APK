@@ -21,6 +21,7 @@ captures/
 *.jks
 *.keystore
 keystore.properties
+sentry.properties
 secrets.txt
 
 # Logs
