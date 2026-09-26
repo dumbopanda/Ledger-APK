@@ -424,13 +424,3 @@ entrypoint = "./functions/delete-account/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/delete-account/*.html" ]
-
-# §11.3's public web deletion page -- verify_jwt = false because the whole point of a public
-# URL is that it's reachable with no Authorization header at all; the person signs in THROUGH
-# the page itself (Google Identity Services web SDK), and only the resulting session's own
-# token is sent, to the sibling delete-account function above, which still verifies it.
-[functions.delete-account-page]
-enabled = true
-verify_jwt = false
-import_map = "./functions/delete-account-page/deno.json"
-entrypoint = "./functions/delete-account-page/index.ts"
