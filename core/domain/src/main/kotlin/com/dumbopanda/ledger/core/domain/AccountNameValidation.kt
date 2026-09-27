@@ -15,7 +15,7 @@ sealed interface AccountNameValidation {
 fun validateAccountName(name: String, otherLiveAccountNames: List<String>): AccountNameValidation {
     val trimmed = name.trim()
     if (trimmed.length !in 1..40) {
-        return AccountNameValidation.Invalid("Name must be 1–40 characters")
+        return AccountNameValidation.Invalid("Keep it to 40 characters or fewer")
     }
     if (otherLiveAccountNames.any { it.equals(trimmed, ignoreCase = true) }) {
         return AccountNameValidation.Invalid("An account named \"$trimmed\" already exists")

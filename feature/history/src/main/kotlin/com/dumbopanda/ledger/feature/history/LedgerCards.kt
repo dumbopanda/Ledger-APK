@@ -143,7 +143,7 @@ fun TxnRow(
                     }
                 }
                 if (!note.isNullOrBlank()) {
-                    Text(note, style = webText(12.5f, FontWeight.Medium, TextMuted, lineHeight = 12.5f * 1.35f))
+                    Text(note, style = webText(12.5f, FontWeight.Medium, TextMuted, lineHeight = 12.5f * 1.35f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

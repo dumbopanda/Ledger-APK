@@ -25,7 +25,7 @@ private val WARNING_DATE_FORMAT = DateTimeFormatter.ofPattern("EEE d MMM yyyy", 
 private const val DAYS_AGO_WARNING_THRESHOLD = 90
 
 fun computeDateFieldHint(dateState: DateFieldState, today: LocalDate): DateFieldHint = when (dateState) {
-    DateFieldState.Empty -> DateFieldHint.Placeholder("Day and month, separated — the year is worked out")
+    DateFieldState.Empty -> DateFieldHint.Placeholder("Day and month, like 5.9. Ledger works out the year.")
     is DateFieldState.Error -> DateFieldHint.Error(dateState.message)
     is DateFieldState.Resolved -> {
         val formatted = dateState.date.format(WARNING_DATE_FORMAT)
@@ -34,9 +34,9 @@ fun computeDateFieldHint(dateState: DateFieldState, today: LocalDate): DateField
         // the spec gives no separate phrasing for "N years ago", so this folds into the same case.
         when {
             dateState.yearInferred && dateState.date.year != today.year ->
-                DateFieldHint.Warning("$formatted — last year")
+                DateFieldHint.Warning("$formatted, last year")
             dateState.daysAgo > DAYS_AGO_WARNING_THRESHOLD ->
-                DateFieldHint.Warning("$formatted — ${dateState.daysAgo} days ago")
+                DateFieldHint.Warning("$formatted, ${dateState.daysAgo} days ago")
             else -> DateFieldHint.None
         }
     }

@@ -197,7 +197,7 @@ private fun SingleRow(entry: Entry, state: HistoryUiState, divider: Boolean, onC
     }
     TxnRow(
         tile = tileFor(account, state.accountOrder),
-        name = entry.expenseName.ifBlank { "—" },
+        name = entry.expenseName.ifBlank { "Untitled" },
         amount = (if (out) "− " else "+ ") + "₹" + formatMoney(entry.amount.minor),
         amountColor = if (out) Coral else Forest,
         tags = tags,

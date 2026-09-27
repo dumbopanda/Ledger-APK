@@ -37,7 +37,7 @@ class ParseDateInputUseCase @Inject constructor(
             return DateFieldState.Error("Numbers only")
         }
         if (parts.size == 1) {
-            return DateFieldState.Error("Add the month too — like 5.9")
+            return DateFieldState.Error("Add the month too, like 5.9")
         }
         if (parts.size > 3) {
             return DateFieldState.Error("Too many parts")

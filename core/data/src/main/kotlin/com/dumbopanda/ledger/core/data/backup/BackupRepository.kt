@@ -30,7 +30,9 @@ sealed interface ExportOutcome {
 }
 
 sealed interface ImportOutcome {
-    data class Success(val accountsAdded: Int, val entriesAdded: Int) : ImportOutcome
+    // skipped: rows the server would refuse (or that don't parse) -- left out rather than
+    // imported into a queue that could never send them.
+    data class Success(val accountsAdded: Int, val entriesAdded: Int, val skipped: Int = 0) : ImportOutcome
     // §7.14: "Rejects a file whose userId differs, with an explanation rather than a silent
     // merge of someone else's ledger."
     data class UserMismatch(val fileUserId: String) : ImportOutcome
@@ -83,7 +85,8 @@ class BackupRepository @Inject constructor(
         } catch (e: SerializationException) {
             return ImportOutcome.InvalidFile
         }
-        val outcome = applyImport(sessionDatabaseHolder.database(), clock, userId, export)
+        val outcome = runCatching { applyImport(sessionDatabaseHolder.database(), clock, userId, export) }
+            .getOrElse { return ImportOutcome.InvalidFile }
         if (outcome is ImportOutcome.Success && (outcome.accountsAdded > 0 || outcome.entriesAdded > 0)) {
             syncScheduler.onOpEnqueued(userPrefsRepository.currentSyncMode())
         }
@@ -115,24 +118,49 @@ internal suspend fun applyImport(db: LedgerDatabase, clock: LedgerClock, current
     if (export.userId != currentUserId) return ImportOutcome.UserMismatch(export.userId)
     var accountsAdded = 0
     var entriesAdded = 0
+    var skipped = 0
     db.withTransaction {
         val opLog = OpLog(db.pendingOpDao(), clock)
+        val importedAccountIds = mutableSetOf<String>()
         for (a in export.accounts) {
             if (db.accountDao().findByClientUid(a.clientUid) != null) continue
-            val entity = a.toEntity()
+            val entity = if (a.isValid()) runCatching { a.toEntity() }.getOrNull() else null
+            if (entity == null) { skipped++; continue }
+            importedAccountIds += entity.id
             db.accountDao().upsert(entity)
             enqueueImportedInsert(opLog, ACCOUNT, entity.clientUid, Json.encodeToString(entity.toPushRow()))
             accountsAdded++
         }
         for (e in export.entries) {
             if (db.entryDao().findByClientUid(e.clientUid) != null) continue
-            val entity = e.toEntity()
+            val accountKnown = e.accountId in importedAccountIds || db.accountDao().findById(e.accountId) != null
+            val entity = if (accountKnown && e.isValid()) runCatching { e.toEntity() }.getOrNull() else null
+            if (entity == null) { skipped++; continue }
             db.entryDao().upsert(entity)
             enqueueImportedInsert(opLog, ENTRY, entity.clientUid, Json.encodeToString(entity.toPushRow()))
             entriesAdded++
         }
     }
-    return ImportOutcome.Success(accountsAdded, entriesAdded)
+    return ImportOutcome.Success(accountsAdded, entriesAdded, skipped)
+}
+
+// The server's own CHECK constraints (0002_accounts.sql, 0003_entries.sql). A backup file is
+// user-editable, so anything outside them is refused here rather than queued to fail forever.
+private fun ExportedAccount.isValid(): Boolean =
+    clientUid.length in 8..64 && name.trim().length in 1..40
+
+private val TXN_ID = Regex("^[YN][a-z0-9]{6}$")
+private val EARLIEST_DATE = java.time.LocalDate.of(2000, 1, 1)
+
+private fun ExportedEntry.isValid(): Boolean {
+    val date = runCatching { java.time.LocalDate.parse(entryDate) }.getOrNull() ?: return false
+    return clientUid.length in 8..64 &&
+        !date.isBefore(EARLIEST_DATE) &&
+        TXN_ID.matches(txnId) &&
+        expenseName.trim().length in 1..120 &&
+        (moreInfo == null || moreInfo.length <= 300) &&
+        txnType.trim().length in 1..60 &&
+        amountMinor in 1..999_999_999
 }
 
 // payloadJson MUST be the real wire shape (EntryPushRow/AccountPushRow via toPushRow()), not

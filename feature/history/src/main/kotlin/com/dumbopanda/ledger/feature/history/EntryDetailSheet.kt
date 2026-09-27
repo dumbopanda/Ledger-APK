@@ -54,9 +54,9 @@ fun buildDetailContent(
     val added = entry.createdAt.atZone(zone).format(ADDED_FORMAT)
     val marks = listOfNotNull(syncMarks[entry.clientUid], sibling?.let { syncMarks[it.clientUid] })
     val status = when {
-        EntrySyncMark.Edited in marks -> "Changed here — the server still has the old version"
-        EntrySyncMark.OnDevice in marks -> "On this device, waiting to be sent"
-        else -> "Synced"
+        EntrySyncMark.Edited in marks -> "Changed on this phone. Not backed up yet."
+        EntrySyncMark.OnDevice in marks -> "Saved on this phone. Not backed up yet."
+        else -> "Backed up"
     }
 
     if (entry.transferGroup != null) {
@@ -66,7 +66,7 @@ fun buildDetailContent(
         val to = received?.let { accounts[it.accountId]?.name }.orEmpty()
         return DetailContent(
             title = "Self transfer",
-            line = "₹$amt moved from your $from account to your $to account on $whenText. Two rows, one thing that happened.",
+            line = "₹$amt moved from $from to $to on $whenText. Your own money, so it isn't counted as spending or income.",
             rows = listOf(
                 "Amount" to "₹$amt moved",
                 "From account" to from,
@@ -76,7 +76,7 @@ fun buildDetailContent(
                 "Transaction name" to entry.expenseName,
                 "Note" to entry.moreInfo,
                 "Date" to formatConfirmDate(entry.entryDate),
-                "Transaction ID" to entry.txnId.value,
+                "Reference" to entry.txnId.value,
                 "Added" to added,
                 "Status" to status,
             ),
@@ -88,9 +88,9 @@ fun buildDetailContent(
     return DetailContent(
         title = entry.expenseName.ifBlank { "Entry" },
         line = if (out) {
-            "₹$amt left your $account account on $whenText for ${entry.expenseName}."
+            "₹$amt went out of $account on $whenText for ${entry.expenseName}."
         } else {
-            "₹$amt came into your $account account on $whenText from ${entry.expenseName}."
+            "₹$amt came into $account on $whenText for ${entry.expenseName}."
         },
         rows = listOf(
             "Amount" to "₹$amt ${if (out) "out" else "in"}",
@@ -100,7 +100,7 @@ fun buildDetailContent(
             "Note" to entry.moreInfo,
             "Date" to formatConfirmDate(entry.entryDate),
             "Will I get this back" to if (entry.txnId.isY) "Yes" else "No",
-            "Transaction ID" to entry.txnId.value,
+            "Reference" to entry.txnId.value,
             "Added" to added,
             "Status" to status,
         ),

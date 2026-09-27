@@ -1,5 +1,6 @@
 package com.dumbopanda.ledger
 
+import android.os.SystemClock
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +24,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dumbopanda.ledger.core.designsystem.component.LedgerPillButton
@@ -52,11 +57,35 @@ fun BiometricGate(
 
     var unlocked by remember { mutableStateOf(false) }
     var promptFailed by remember { mutableStateOf(false) }
+    var authenticating by remember { mutableStateOf(false) }
+    var stoppedAt by remember { mutableStateOf<Long?>(null) }
+
+    // "Asked each time Ledger opens": coming back after more than a minute away locks again. The
+    // PIN screen itself stops this activity, so a stop during authentication doesn't count.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> if (!authenticating) stoppedAt = SystemClock.elapsedRealtime()
+                Lifecycle.Event.ON_START -> {
+                    val away = stoppedAt?.let { SystemClock.elapsedRealtime() - it }
+                    if (away != null && away > RELOCK_AFTER_MS) {
+                        unlocked = false
+                        promptFailed = false
+                    }
+                    stoppedAt = null
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val required = requireBiometric
     val activity = context as? FragmentActivity
     val canAuthenticate = activity != null &&
-        BiometricManager.from(context).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
+        BiometricManager.from(context).canAuthenticate(APP_LOCK_AUTHENTICATORS) ==
         BiometricManager.BIOMETRIC_SUCCESS
 
     if (required == null || !required || unlocked || activity == null || !canAuthenticate) {
@@ -66,7 +95,9 @@ fun BiometricGate(
 
     LaunchedEffect(required, promptFailed) {
         if (!promptFailed) {
+            authenticating = true
             unlocked = authenticateBiometric(activity, "Unlock Ledger")
+            authenticating = false
             if (!unlocked) promptFailed = true
         }
     }
@@ -104,9 +135,15 @@ private suspend fun authenticateBiometric(activity: FragmentActivity, title: Str
         )
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle(title)
-            .setNegativeButtonText("Cancel")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+            .setAllowedAuthenticators(APP_LOCK_AUTHENTICATORS)
             .build()
         cont.invokeOnCancellation { prompt.cancelAuthentication() }
         prompt.authenticate(promptInfo)
     }
+
+// The setting promises "fingerprint or screen lock": a phone with only a PIN used to get no lock
+// at all, because biometric-only auth reported "unavailable" and the gate fails open.
+// No negative button is allowed alongside DEVICE_CREDENTIAL; the PIN screen has its own cancel.
+private const val APP_LOCK_AUTHENTICATORS =
+    BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+private const val RELOCK_AFTER_MS = 60_000L

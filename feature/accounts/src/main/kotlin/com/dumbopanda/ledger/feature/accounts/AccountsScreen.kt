@@ -3,6 +3,8 @@ package com.dumbopanda.ledger.feature.accounts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -65,6 +67,7 @@ internal fun AccountsScreen(
             )
             if (uiState is AccountsUiState.Ready) {
                 AccountsPanel(uiState, onAction)
+                uiState.archiveNotice?.let { Text(it, style = webText(13f, FontWeight.SemiBold, Coral)) }
                 AddPanel(uiState, onAction)
             }
         }
@@ -87,21 +90,25 @@ private fun AccountsPanel(state: AccountsUiState.Ready, onAction: (AccountsActio
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AccountRow(account: Account, isFirst: Boolean, isLast: Boolean, onAction: (AccountsAction) -> Unit) {
-    Row(
+    // Name on its own line, buttons wrapping beneath: side by side, four buttons squeezed a
+    // long name to one letter per line at large text sizes (seen live at 1.5x).
+    Column(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(Modifier.weight(1f).alpha(if (account.isArchived) 0.55f else 1f)) {
-            Text(account.name, style = webText(14f, FontWeight.SemiBold))
+        Column(Modifier.alpha(if (account.isArchived) 0.55f else 1f)) {
+            Text(account.name, style = webText(15f, FontWeight.SemiBold))
             if (account.isArchived) Text("Archived", style = webText(12f, FontWeight.Medium, TextMuted), modifier = Modifier.padding(top = 2.dp))
         }
-        LedgerMiniButton("↑", { onAction(AccountsAction.MoveUp(account)) }, enabled = !isFirst)
-        LedgerMiniButton("↓", { onAction(AccountsAction.MoveDown(account)) }, enabled = !isLast)
-        LedgerMiniButton("Rename", { onAction(AccountsAction.RenameTapped(account)) })
-        LedgerMiniButton(if (account.isArchived) "Restore" else "Archive", { onAction(AccountsAction.ArchiveToggled(account)) })
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LedgerMiniButton("↑", { onAction(AccountsAction.MoveUp(account)) }, enabled = !isFirst)
+            LedgerMiniButton("↓", { onAction(AccountsAction.MoveDown(account)) }, enabled = !isLast)
+            LedgerMiniButton("Rename", { onAction(AccountsAction.RenameTapped(account)) })
+            LedgerMiniButton(if (account.isArchived) "Restore" else "Archive", { onAction(AccountsAction.ArchiveToggled(account)) })
+        }
     }
 }
 

@@ -15,5 +15,6 @@ sealed interface AccountsUiState {
         val addingNew: Boolean,
         val newName: String,
         val newNameError: String?,
+        val archiveNotice: String? = null,
     ) : AccountsUiState
 }

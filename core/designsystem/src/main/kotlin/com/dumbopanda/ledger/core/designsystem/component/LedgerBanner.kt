@@ -64,7 +64,7 @@ fun LedgerBanner(
 private fun LedgerBannerPreview() {
     LedgerTheme {
         LedgerBanner(
-            text = "Session expired — showing local data",
+            text = "Signed out. Showing what's on this phone.",
             tone = LedgerBannerTone.Warning,
             onDismiss = {},
         )

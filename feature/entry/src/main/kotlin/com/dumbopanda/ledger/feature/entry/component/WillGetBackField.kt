@@ -45,7 +45,7 @@ fun WillGetBackGroup(
                     options = listOf(false, true),
                     selected = backOld,
                     onSelect = onBackKind,
-                    optionLabel = { old -> if (old) "Old — this is money coming back" else "New — I am lending or paying out now" },
+                    optionLabel = { old -> if (old) "Money coming back to me" else "A new loan I'm giving" },
                 )
             }
             if (backOld) {

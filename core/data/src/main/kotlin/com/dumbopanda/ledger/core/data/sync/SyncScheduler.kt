@@ -6,7 +6,12 @@ import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import com.dumbopanda.ledger.core.common.LedgerClock
 import com.dumbopanda.ledger.core.database.LedgerDatabaseFactory
 import com.dumbopanda.ledger.core.datastore.SessionStore
@@ -56,13 +61,25 @@ class SyncScheduler @Inject constructor(
     // refresh that finally succeeded) -- ops accumulated while signed out.
     fun onSessionRestored() = enqueueNow()
 
+    // KEEP here used to let Smart mode's still-waiting delayed job win, so "Send now" did nothing
+    // until the settle timer fired (seen live). A waiting job is replaced so the sync starts now;
+    // a running one is left alone and this one queued straight after it, so nothing is cut off
+    // mid-push and anything saved during that push still goes out.
     private fun enqueueNow() {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(networkConstraint)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, RETRY_SECONDS, TimeUnit.SECONDS)
             .build()
-        workManager.enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, request)
+        scope.launch {
+            val running = runCatching { workManager.getWorkInfosForUniqueWork(UNIQUE_WORK_NAME).get() }
+                .getOrDefault(emptyList())
+                .any { it.state == WorkInfo.State.RUNNING }
+            val policy = if (running) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.REPLACE
+            workManager.enqueueUniqueWork(UNIQUE_WORK_NAME, policy, request)
+        }
     }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Settle restarts on every new op (REPLACE) so a burst goes out as one
     // call; the ceiling is measured from the OLDEST queued op and never

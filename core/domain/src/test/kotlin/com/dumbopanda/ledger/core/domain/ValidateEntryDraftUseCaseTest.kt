@@ -35,8 +35,8 @@ class ValidateEntryDraftUseCaseTest {
         editModeOriginalIsTransfer = editModeOriginalIsTransfer,
     )
 
-    private val transferToEntry = "A transfer is two rows and an entry is one — cancel and add a new one instead"
-    private val entryToTransfer = "An entry is one row and a transfer is two — cancel and add a new one instead"
+    private val transferToEntry = "A transfer can't become a payment. Cancel this edit and add a new entry instead."
+    private val entryToTransfer = "A payment can't become a transfer. Cancel this edit and add a new transfer instead."
 
     @Test
     fun `a fully valid draft passes`() {

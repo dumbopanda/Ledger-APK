@@ -41,30 +41,30 @@ fun buildConfirmSheet(
     val line: String
     val rows: List<Pair<String, String?>>
     if (draft.selfTransfer) {
-        line = "₹$amt moves from your ${account.name} account to your ${toAccount.name} account on $whenText. " +
-            "It is your own money changing hands, so it is recorded as two rows but counts as neither spending nor income."
+        line = "₹$amt moves from ${account.name} to ${toAccount.name} on $whenText. " +
+            "It's your own money moving, so it doesn't count as spending or income."
         rows = listOf(
             "Amount" to "₹$amt moved",
             "From account" to account.name,
             "To account" to toAccount.name,
-            "Sent leg category" to txnTypeFor(draft.sentLegType),
-            "Received leg category" to txnTypeFor(draft.receivedLegType),
+            "Category, money out" to txnTypeFor(draft.sentLegType),
+            "Category, money in" to txnTypeFor(draft.receivedLegType),
             "Transaction name" to draft.expenseName,
             "Note" to draft.moreInfo,
             "Date" to whenFull,
-            "Transaction ID" to draft.txnId.value,
+            "Reference" to draft.txnId.value,
         )
     } else {
         val debit = draft.direction == TxnDirection.Debit
         val head = if (debit) {
-            "₹$amt leaves your ${account.name} account on $whenText for ${draft.expenseName}. "
+            "₹$amt goes out of ${account.name} on $whenText for ${draft.expenseName}. "
         } else {
-            "₹$amt comes into your ${account.name} account on $whenText from ${draft.expenseName}. "
+            "₹$amt comes into ${account.name} on $whenText for ${draft.expenseName}. "
         }
         val tail = when {
-            !draft.txnId.isY -> "It is a one-way payment, so nothing is expected back."
-            backOld -> "It closes an open item, so it drops off Owed to me once it is saved."
-            else -> "It is marked to be returned, so it stays under Owed to me until the other half is entered."
+            !draft.txnId.isY -> "Nothing is expected back."
+            backOld -> "It settles an open loan, so it leaves Owed to me."
+            else -> "You expect it back, so it stays in Owed to me until it's repaid."
         }
         line = head + tail
         rows = listOf(
@@ -79,7 +79,7 @@ fun buildConfirmSheet(
                 backOld -> "Yes · closing an open one"
                 else -> "Yes · a new one"
             },
-            "Transaction ID" to draft.txnId.value,
+            "Reference" to draft.txnId.value,
         )
     }
 
@@ -87,9 +87,9 @@ fun buildConfirmSheet(
     return ConfirmSheetContent(
         title = if (isEditing) "Save these changes?" else "Add this entry?",
         line = line,
-        note = lakh?.let { "That is $it — check the zeros" },
+        note = lakh?.let { "That's $it. Check the zeros." },
         rows = rows,
-        backLabel = if (isEditing) "Keep editing" else "Edit entry",
+        backLabel = if (isEditing) "Keep editing" else "Go back",
         confirmLabel = if (isEditing) "Save changes" else "Add entry",
     )
 }

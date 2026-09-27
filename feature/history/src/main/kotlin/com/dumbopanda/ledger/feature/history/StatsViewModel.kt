@@ -129,9 +129,9 @@ class StatsViewModel @Inject constructor(
         }
 
         val keyOf: (Entry) -> String = when (breakdown.value) {
-            Breakdown.NAME -> { e -> e.expenseName.trim().ifEmpty { "—" } }
-            Breakdown.CATEGORY -> { e -> e.txnType.trim().ifEmpty { "—" } }
-            Breakdown.ACCOUNT -> { e -> byId[e.accountId]?.name ?: "—" }
+            Breakdown.NAME -> { e -> e.expenseName.trim().ifEmpty { "Untitled" } }
+            Breakdown.CATEGORY -> { e -> e.txnType.trim().ifEmpty { "No category" } }
+            Breakdown.ACCOUNT -> { e -> byId[e.accountId]?.name ?: "Removed account" }
         }
         val groups = spend.groupBy(keyOf)
             .map { (name, list) -> SpendGroup(name, list.sumOf { it.amount.minor }, list.size) }
@@ -158,8 +158,8 @@ class StatsViewModel @Inject constructor(
             facts = listOf(
                 "Entries" to rows.size.toString(),
                 "Money in" to "₹${formatMoney(income.sumOf { it.amount.minor })}",
-                "Biggest expense" to (biggest?.let { "${it.expenseName} · ₹${formatMoney(it.amount.minor)}" } ?: "—"),
-                "Average a day" to "₹${formatMoney(perDayRupees * 100)} over $elapsed ${if (elapsed == 1) "day" else "days"}",
+                "Biggest expense" to (biggest?.let { "${it.expenseName} · ₹${formatMoney(it.amount.minor)}" } ?: "None yet"),
+                "Daily average" to "₹${formatMoney(perDayRupees * 100)} over $elapsed ${if (elapsed == 1) "day" else "days"}",
                 "Days with spending" to "$spendDays of $elapsed",
                 "Owed to me" to if (owed > 0) "₹${formatMoney(owed)}" else "Nothing open",
             ),

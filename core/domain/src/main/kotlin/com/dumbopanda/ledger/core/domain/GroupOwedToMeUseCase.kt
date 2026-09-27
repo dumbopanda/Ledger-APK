@@ -20,7 +20,8 @@ import javax.inject.Inject
 class GroupOwedToMeUseCase @Inject constructor() {
     fun group(entries: List<Entry>): List<OwedToMeItem> =
         entries
-            .filter { it.txnId.isY }
+            // A self transfer's legs share a Y id too, but nobody owes anything -- they're not loans.
+            .filter { it.txnId.isY && it.transferGroup == null }
             .groupBy { it.txnId }
             .map { (txnId, legs) ->
                 val ordered = legs.sortedWith(compareBy(Entry::entryDate, Entry::createdAt))

@@ -79,12 +79,12 @@ class DateParserTest {
 
     @Test
     fun `a single number with no separator asks for the month`() {
-        assertError("5", "Add the month too — like 5.9")
+        assertError("5", "Add the month too, like 5.9")
     }
 
     @Test
     fun `three digits with no separator is still one part, not day-plus-month`() {
-        assertError("212", "Add the month too — like 5.9")
+        assertError("212", "Add the month too, like 5.9")
     }
 
     // -- Too many parts ---------------------------------------------------------

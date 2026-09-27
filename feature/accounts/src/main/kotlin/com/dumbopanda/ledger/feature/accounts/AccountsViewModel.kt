@@ -39,14 +39,14 @@ class AccountsViewModel @Inject constructor(
     private var addingNew = false
     private var newName = ""
     private var newNameError: String? = null
+    private var archiveNotice: String? = null
 
     private val _uiState = MutableStateFlow<AccountsUiState>(AccountsUiState.Loading)
     val uiState: StateFlow<AccountsUiState> = _uiState.asStateFlow()
 
     init {
-        // Once, not on every accounts emission -- ensureSeeded's own transaction is the guard
-        // against double-seeding, not this call site.
-        viewModelScope.launch { accountRepository.ensureSeeded() }
+        // C15: no ensureSeeded() fallback here anymore -- see EntryViewModel's own note. Same
+        // race against AccountSetupOverlay, same fix.
         viewModelScope.launch { accounts.collect { publish(it) } }
     }
 
@@ -58,7 +58,7 @@ class AccountsViewModel @Inject constructor(
                 editingError = null
             }
             is AccountsAction.RenameTextChanged -> {
-                editingText = action.text
+                editingText = action.text.take(MAX_ACCOUNT_NAME)
                 editingError = null
             }
             AccountsAction.RenameCancelled -> {
@@ -76,7 +76,7 @@ class AccountsViewModel @Inject constructor(
                 newNameError = null
             }
             is AccountsAction.NewNameChanged -> {
-                newName = action.text
+                newName = action.text.take(MAX_ACCOUNT_NAME)
                 newNameError = null
             }
             AccountsAction.AddCancelled -> {
@@ -125,8 +125,16 @@ class AccountsViewModel @Inject constructor(
         }
     }
 
+    // Archiving the last active account would leave Add Payment with nowhere to record anything
+    // and no way back from that screen, so it's refused with a reason instead.
     private fun toggleArchive(account: Account) {
-        viewModelScope.launch { accountRepository.setArchived(account.id, archived = !account.isArchived) }
+        val archiving = !account.isArchived
+        if (archiving && accounts.value.count { !it.isArchived } <= 1) {
+            archiveNotice = "Keep at least one account. Add another before archiving this one."
+            return
+        }
+        archiveNotice = null
+        viewModelScope.launch { accountRepository.setArchived(account.id, archived = archiving) }
     }
 
     private fun move(account: Account, delta: Int) {
@@ -147,6 +155,10 @@ class AccountsViewModel @Inject constructor(
             addingNew = addingNew,
             newName = newName,
             newNameError = newNameError,
+            archiveNotice = archiveNotice,
         )
     }
 }
+
+// Matches the server's check on accounts.name (0002_accounts.sql).
+private const val MAX_ACCOUNT_NAME = 40

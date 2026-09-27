@@ -96,6 +96,7 @@ class EntryViewModel @Inject constructor(
     private var editBannerSub: String? = null
     private var dateText = TextFieldValue("")
     private var quickDate: QuickDate? = null
+    private var lateNightDefault = false
     private var nameCustomMode = false
     private var backOld = false
     private var invalid: DraftField? = null
@@ -119,8 +120,10 @@ class EntryViewModel @Inject constructor(
     val events: SharedFlow<EntryEvent> = _events.asSharedFlow()
 
     init {
-        // A safety net only -- AccountSetup (app module) is what normally creates accounts.
-        viewModelScope.launch { accountRepository.ensureSeeded() }
+        // C15: no ensureSeeded() fallback here anymore -- AccountSetupOverlay (app module) now
+        // sits on top of Home itself and unconditionally blocks it for a zero-account user, so
+        // this used to race that overlay's own hasAnyAccount() check and could win, silently
+        // seeding Domestic/International/Cash before the user ever saw the popup.
         viewModelScope.launch {
             combine(accounts, openItems, knownNames, editRequestStore.request) { accs, _, _, edit -> accs to edit }
                 .collect { (accs, edit) -> recompute(accs, edit) }
@@ -137,6 +140,7 @@ class EntryViewModel @Inject constructor(
             is EntryAction.DateTextChanged -> {
                 dateText = action.value
                 quickDate = null
+                lateNightDefault = false
                 draft = current.copy(resolvedDate = resolvedDate(action.value.text))
                 clearInvalid(DraftField.DATE)
             }
@@ -148,6 +152,7 @@ class EntryViewModel @Inject constructor(
                 val date = if (action.quick == QuickDate.TODAY) today() else today().minusDays(1)
                 dateText = formatted(date)
                 quickDate = action.quick
+                lateNightDefault = false
                 draft = current.copy(resolvedDate = date)
                 clearInvalid(DraftField.DATE)
             }
@@ -214,8 +219,21 @@ class EntryViewModel @Inject constructor(
             editRequestStore.consume()
         } else if (draft == null) {
             resetForm(accs)
+        } else {
+            keepAccountsValid(accs)
         }
         publish()
+    }
+
+    // The draft outlives the account list: an account archived (or replaced by a sync) while
+    // it was picked would otherwise stay "selected" with no chip lit, and be saved against.
+    private fun keepAccountsValid(accs: List<Account>) {
+        val d = draft ?: return
+        val ids = accs.map { it.id }.toSet()
+        if (d.accountId in ids && d.toAccountId in ids) return
+        val from = if (d.accountId in ids) d.accountId else accs.first().id
+        val to = if (d.toAccountId in ids && d.toAccountId != from) d.toAccountId else (accs.firstOrNull { it.id != from } ?: accs.first()).id
+        draft = d.copy(accountId = from, toAccountId = to)
     }
 
     private fun beginEdit(edit: EditRequest, accs: List<Account>) {
@@ -223,12 +241,13 @@ class EntryViewModel @Inject constructor(
         draft = result.draft
         editingOriginal = result.original
         dateText = formatted(result.draft.resolvedDate ?: today())
+        lateNightDefault = false
         quickDate = null
         nameCustomMode = isCustomName(result.draft.expenseName)
         backOld = false
         invalid = null
         confirm = null
-        editBannerSub = "${edit.entry.txnId.value} · ${formatDisplayDate(edit.entry.entryDate)} · ₹${formatMoney(edit.entry.amount.minor)}"
+        editBannerSub = "${edit.entry.expenseName} · ${formatDisplayDate(edit.entry.entryDate)} · ₹${formatMoney(edit.entry.amount.minor)}"
     }
 
     // index.html's fullReset(): the default date (by the 05:30 rule), the first account, No.
@@ -253,6 +272,7 @@ class EntryViewModel @Inject constructor(
         )
         dateText = formatted(date)
         quickDate = if (beforeDayStarts) QuickDate.YESTERDAY else QuickDate.TODAY
+        lateNightDefault = beforeDayStarts
         editingOriginal = null
         editBannerSub = null
         nameCustomMode = false
@@ -265,7 +285,7 @@ class EntryViewModel @Inject constructor(
         if (editingOriginal == null) return
         resetForm(accounts.value.ifEmpty { return })
         publish()
-        _events.tryEmit(EntryEvent.Toast("Edit cancelled — nothing changed"))
+        _events.tryEmit(EntryEvent.Toast("Edit cancelled. Nothing changed."))
     }
 
     private fun onSaveTapped(current: EntryDraft) {
@@ -339,7 +359,8 @@ class EntryViewModel @Inject constructor(
             saving = false
             val id = cleaned.txnId.value
             if (original == null) {
-                _events.tryEmit(EntryEvent.Toast(if (cleaned.selfTransfer) "Transfer added · $id" else "Added · $id"))
+                _events.tryEmit(EntryEvent.Toast(if (cleaned.selfTransfer) "Transfer added" else "Added"))
+                _events.tryEmit(EntryEvent.Saved)
             } else {
                 _events.tryEmit(EntryEvent.Toast("Updated"))
                 _events.tryEmit(EntryEvent.EditSaved)
@@ -458,8 +479,10 @@ class EntryViewModel @Inject constructor(
             dateText = dateText,
             dateFieldState = parseDateInput(dateText.text),
             quickDate = quickDate,
+            lateNightDefault = lateNightDefault,
             accounts = accounts.value,
-            knownNames = knownNames.value,
+            // "Self Transfer" is the transfer toggle's own name, not one to pick for a payment.
+            knownNames = if (d.selfTransfer) knownNames.value else knownNames.value.filterNot { it == "Self Transfer" },
             nameCustomMode = nameCustomMode,
             openItems = openItems.value,
             backOld = backOld,

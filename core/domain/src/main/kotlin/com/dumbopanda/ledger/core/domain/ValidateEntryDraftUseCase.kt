@@ -22,9 +22,9 @@ class ValidateEntryDraftUseCase @Inject constructor() {
         if (original != null && original != draft.selfTransfer) {
             return EntryDraftValidation.Blocked(
                 if (original) {
-                    "A transfer is two rows and an entry is one — cancel and add a new one instead"
+                    "A transfer can't become a payment. Cancel this edit and add a new entry instead."
                 } else {
-                    "An entry is one row and a transfer is two — cancel and add a new one instead"
+                    "A payment can't become a transfer. Cancel this edit and add a new transfer instead."
                 },
             )
         }

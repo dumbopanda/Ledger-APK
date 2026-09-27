@@ -42,11 +42,11 @@ class ConfirmSentenceTest {
     fun `a one-way debit reads as money leaving, nothing expected back`() {
         val sheet = buildConfirmSheet(draft(), domestic, cash, backOld = false, isEditing = false)
         assertEquals(
-            "₹4,500.00 leaves your Domestic account on 14 Sept 2026 for Rapido. It is a one-way payment, so nothing is expected back.",
+            "₹4,500.00 goes out of Domestic on 14 Sept 2026 for Rapido. Nothing is expected back.",
             sheet.line,
         )
         assertEquals("Add this entry?", sheet.title)
-        assertEquals("Edit entry", sheet.backLabel)
+        assertEquals("Go back", sheet.backLabel)
         assertEquals("Add entry", sheet.confirmLabel)
         assertNull(sheet.note)
     }
@@ -55,7 +55,7 @@ class ConfirmSentenceTest {
     fun `a credit reads as money coming in from the name`() {
         val sheet = buildConfirmSheet(draft(direction = TxnDirection.Credit, name = "Salary"), domestic, cash, backOld = false, isEditing = false)
         assertEquals(
-            "₹4,500.00 comes into your Domestic account on 14 Sept 2026 from Salary. It is a one-way payment, so nothing is expected back.",
+            "₹4,500.00 comes into Domestic on 14 Sept 2026 for Salary. Nothing is expected back.",
             sheet.line,
         )
     }
@@ -63,11 +63,11 @@ class ConfirmSentenceTest {
     @Test
     fun `a new Y stays under Owed to me, an old Y closes one`() {
         val new = buildConfirmSheet(draft(txnId = "Yabc123"), domestic, cash, backOld = false, isEditing = false)
-        assertEquals(true, new.line.endsWith("It is marked to be returned, so it stays under Owed to me until the other half is entered."))
+        assertEquals(true, new.line.endsWith("You expect it back, so it stays in Owed to me until it's repaid."))
         assertEquals("Yes · a new one", new.rows.first { it.first == "Will I get this back" }.second)
 
         val old = buildConfirmSheet(draft(txnId = "Yabc123"), domestic, cash, backOld = true, isEditing = false)
-        assertEquals(true, old.line.endsWith("It closes an open item, so it drops off Owed to me once it is saved."))
+        assertEquals(true, old.line.endsWith("It settles an open loan, so it leaves Owed to me."))
         assertEquals("Yes · closing an open one", old.rows.first { it.first == "Will I get this back" }.second)
     }
 
@@ -75,8 +75,8 @@ class ConfirmSentenceTest {
     fun `a self transfer reads as money moving between the two accounts`() {
         val sheet = buildConfirmSheet(draft(amount = "10000", selfTransfer = true, name = "Self Transfer", txnId = "Yabc123"), domestic, cash, backOld = false, isEditing = false)
         assertEquals(
-            "₹10,000.00 moves from your Domestic account to your Cash account on 14 Sept 2026. " +
-                "It is your own money changing hands, so it is recorded as two rows but counts as neither spending nor income.",
+            "₹10,000.00 moves from Domestic to Cash on 14 Sept 2026. " +
+                "It's your own money moving, so it doesn't count as spending or income.",
             sheet.line,
         )
         assertEquals("₹10,000.00 moved", sheet.rows.first { it.first == "Amount" }.second)
@@ -86,7 +86,7 @@ class ConfirmSentenceTest {
     @Test
     fun `a lakh or more gets the check-the-zeros note, and editing relabels everything`() {
         val sheet = buildConfirmSheet(draft(amount = "123456"), domestic, cash, backOld = false, isEditing = true)
-        assertEquals("That is 1.23 lakh — check the zeros", sheet.note)
+        assertEquals("That's 1.23 lakh. Check the zeros.", sheet.note)
         assertEquals("Save these changes?", sheet.title)
         assertEquals("Keep editing", sheet.backLabel)
         assertEquals("Save changes", sheet.confirmLabel)

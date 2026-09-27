@@ -26,12 +26,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dumbopanda.ledger.core.designsystem.component.LedgerBanner
 import com.dumbopanda.ledger.core.designsystem.component.LedgerBannerTone
 import com.dumbopanda.ledger.core.designsystem.component.LedgerPillButton
+import com.dumbopanda.ledger.core.designsystem.component.LedgerTextField
 import java.time.LocalDate
 
 @Composable
@@ -53,6 +55,9 @@ fun DeleteAccountRoute(
         hasExportedThisSession = viewModel.hasExportedThisSession,
         onExport = { uri -> viewModel.export(uri) { message -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show() } },
         onConfirmDeletion = { viewModel.reauthenticateAndDelete(context) },
+        onReauthCodeChanged = viewModel::onReauthCodeChanged,
+        onVerifyReauthCode = viewModel::verifyReauthCodeAndDelete,
+        onResendReauthCode = viewModel::resendReauthCode,
         onDone = onAccountDeleted,
         onCancel = onCancel,
     )
@@ -67,6 +72,9 @@ internal fun DeleteAccountScreen(
     onConfirmDeletion: () -> Unit,
     onDone: () -> Unit,
     onCancel: () -> Unit,
+    onReauthCodeChanged: (String) -> Unit = {},
+    onVerifyReauthCode: () -> Unit = {},
+    onResendReauthCode: () -> Unit = {},
 ) {
     var showBackupNudge by remember { mutableStateOf(false) }
     var showTypeDeleteDialog by remember { mutableStateOf(false) }
@@ -78,6 +86,7 @@ internal fun DeleteAccountScreen(
         when (uiState) {
             DeleteAccountUiState.Deleted -> DeletedContent(onDone)
             DeleteAccountUiState.Deleting, DeleteAccountUiState.Reauthenticating -> ProgressContent(uiState)
+            is DeleteAccountUiState.EmailReauth -> EmailReauthContent(uiState, onReauthCodeChanged, onVerifyReauthCode, onResendReauthCode)
             else -> ConfirmingContent(
                 uiState = uiState,
                 lastBackupAt = lastBackupAt,
@@ -96,7 +105,7 @@ internal fun DeleteAccountScreen(
         AlertDialog(
             onDismissRequest = { showBackupNudge = false },
             title = { Text("You haven't saved a backup") },
-            text = { Text("Once your account is deleted this can't be undone -- saving a backup first is the only way to keep a copy.") },
+            text = { Text("Once your account is deleted there's no undo. Save a file first if you want to keep a copy.") },
             confirmButton = {
                 LedgerPillButton(
                     text = "Save a backup",
@@ -142,8 +151,9 @@ private fun ConfirmingContent(
         Spacer(Modifier.height(16.dp))
         // Step 1: "exactly what is deleted... and that it is immediate and irreversible."
         Text(
-            "This deletes your entries, your accounts, your profile, and your Google sign-in " +
-                "link. It happens immediately and cannot be undone.",
+            // C13: was "your Google sign-in link" -- now true for either sign-in method.
+            "This deletes your entries, your accounts, your profile, and your sign-in. " +
+                "It happens immediately and cannot be undone.",
             style = MaterialTheme.typography.bodyLarge,
         )
         Spacer(Modifier.height(24.dp))
@@ -187,6 +197,49 @@ private fun ProgressContent(uiState: DeleteAccountUiState) {
             if (uiState == DeleteAccountUiState.Reauthenticating) "Verifying it's you..." else "Deleting your account...",
             style = MaterialTheme.typography.bodyLarge,
         )
+    }
+}
+
+// C13: step 4 for an email-sign-in account -- a fresh code to the already-signed-in address
+// (shown, never editable: unlike feature:auth's sign-in flow, there's nothing to type here)
+// stands in for Credential Manager's picker. Verifying it goes straight into delete(), same as
+// a matched Google re-auth would.
+@Composable
+private fun EmailReauthContent(
+    uiState: DeleteAccountUiState.EmailReauth,
+    onCodeChanged: (String) -> Unit,
+    onVerify: () -> Unit,
+    onResend: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Verify it's you", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Enter the 6-digit code sent to ${uiState.email} to confirm deletion.",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        if (uiState.error != null) {
+            LedgerBanner(text = uiState.error, tone = LedgerBannerTone.Error)
+        }
+        if (uiState.sending) {
+            CircularProgressIndicator()
+        } else {
+            LedgerTextField(
+                value = uiState.code,
+                onValueChange = onCodeChanged,
+                label = "6-digit code",
+                keyboardType = KeyboardType.NumberPassword,
+                isError = uiState.error != null,
+            )
+            LedgerPillButton(
+                text = "Verify and delete",
+                onClick = onVerify,
+                enabled = !uiState.verifying && uiState.code.length == 6,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            TextButton(onClick = onResend, enabled = uiState.resendInS <= 0) {
+                Text(if (uiState.resendInS > 0) "Resend code in ${uiState.resendInS}s" else "Resend code")
+            }
+        }
     }
 }
 

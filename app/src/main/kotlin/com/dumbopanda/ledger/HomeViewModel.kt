@@ -54,6 +54,8 @@ class HomeViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     private val snoozedUntil = userPrefsRepository.nudgeSnoozedUntil()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    private val online = connectivityChecker.onlineFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), connectivityChecker.isOnline())
 
     private val _uiState = MutableStateFlow(build())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -63,7 +65,7 @@ class HomeViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            combine(pending, syncMode, hasEntries, lastBackupAt, snoozedUntil) { _, _, _, _, _ -> }.collect { _uiState.value = build() }
+            combine<Any?, Unit>(pending, syncMode, hasEntries, lastBackupAt, snoozedUntil, online) { }.collect { _uiState.value = build() }
         }
     }
 
@@ -77,9 +79,9 @@ class HomeViewModel @Inject constructor(
     fun export(uri: Uri) {
         viewModelScope.launch {
             val message = when (backupRepository.exportTo(uri)) {
-                is ExportOutcome.Success -> "Backup saved"
-                ExportOutcome.NotSignedIn -> "Sign in before backing up"
-                ExportOutcome.WriteError -> "That file could not be written"
+                is ExportOutcome.Success -> "File saved"
+                ExportOutcome.NotSignedIn -> "Sign in before saving a file."
+                ExportOutcome.WriteError -> "That file couldn't be saved."
             }
             _events.tryEmit(message)
         }
@@ -88,7 +90,7 @@ class HomeViewModel @Inject constructor(
     // Every flow read here is declared above `_uiState`.
     private fun build() = HomeUiState(
         pendingCount = pending.value,
-        online = connectivityChecker.isOnline(),
+        online = online.value,
         syncMode = syncMode.value,
         showBackupBar = shouldShowNightlyNudge(
             clock.now().atZone(ZoneId.systemDefault()),

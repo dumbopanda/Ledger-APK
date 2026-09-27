@@ -1,5 +1,6 @@
 package com.dumbopanda.ledger.feature.settings
 
+import android.app.KeyguardManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -83,6 +84,7 @@ internal fun SettingsScreen(
     onDeleteAccountRequested: () -> Unit,
 ) {
     val context = LocalContext.current
+    val toast = LocalLedgerToast.current
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) onAction(SettingsAction.ExportRequested(uri))
     }
@@ -98,14 +100,14 @@ internal fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Panel {
-                AcctRow("Waiting to be sent", state.queueSummary) {
+                AcctRow("Backing up to your account", state.queueSummary) {
                     LedgerMiniButton(state.sendLabel, { onAction(SettingsAction.SendNowTapped) }, primary = true, enabled = state.sendEnabled)
                 }
                 RowDivider()
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
-                    Text("When to send", style = webText(14f, FontWeight.SemiBold), modifier = Modifier.padding(bottom = 10.dp))
+                    Text("When to back up", style = webText(14f, FontWeight.SemiBold), modifier = Modifier.padding(bottom = 10.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(SyncMode.SMART to "Batched", SyncMode.INSTANT to "Instant", SyncMode.MANUAL to "Manual").forEach { (mode, label) ->
+                        listOf(SyncMode.SMART to "Smart", SyncMode.INSTANT to "Instant", SyncMode.MANUAL to "Manual").forEach { (mode, label) ->
                             LedgerPill(label, state.syncMode == mode, { onAction(SettingsAction.SyncModeChanged(mode)) }, Modifier.weight(1f), PillStyles.SegChip)
                         }
                     }
@@ -114,14 +116,14 @@ internal fun SettingsScreen(
             }
 
             Panel {
-                AcctRow("Backup", state.backupStatus) {
+                AcctRow("Your own copy", state.backupStatus) {
                     LedgerMiniButton(
                         if (state.importing) "Restoring…" else "Restore",
                         { importLauncher.launch(arrayOf("application/json")) },
                         enabled = !state.importing,
                     )
                     LedgerMiniButton(
-                        if (state.exporting) "Saving…" else "Save",
+                        if (state.exporting) "Saving…" else "Save file",
                         { exportLauncher.launch("ledger-backup-${LocalDate.now()}.json") },
                         primary = true,
                         enabled = !state.exporting,
@@ -136,9 +138,18 @@ internal fun SettingsScreen(
             Panel {
                 SwitchRow(
                     title = "Require fingerprint or screen lock to open",
-                    desc = "Asked each time Ledger opens.",
+                    desc = "Asked when you open Ledger, and again after a minute away.",
                     checked = state.requireBiometricToOpen,
-                    onChange = { onAction(SettingsAction.RequireBiometricToggled(it)) },
+                    onChange = { on ->
+                        // With no screen lock on the phone there's nothing to ask for, so the lock
+                        // would quietly do nothing. Say so instead of pretending it's on.
+                        val secure = context.getSystemService(KeyguardManager::class.java)?.isDeviceSecure == true
+                        if (on && !secure) {
+                            toast.show("Set a screen lock in your phone's settings first.")
+                        } else {
+                            onAction(SettingsAction.RequireBiometricToggled(on))
+                        }
+                    },
                 )
                 RowDivider()
                 // The switch reads "hide", the stored preference is "show" -- so it's inverted
@@ -152,22 +163,22 @@ internal fun SettingsScreen(
             }
 
             Panel {
-                AcctRow("Signed in", state.signedInEmail ?: "—") {
+                AcctRow("Signed in", state.signedInEmail ?: "Not signed in") {
                     LedgerMiniButton(if (state.signingOut) "Signing out…" else "Sign out", { onAction(SettingsAction.SignOutTapped) }, enabled = !state.signingOut)
                 }
                 RowDivider()
-                AcctRow("Delete account", "Removes everything, on every device. Can't be undone.") {
+                AcctRow("Delete account", "Erases your account and every entry, on every phone. There's no undo.") {
                     LedgerMiniButton("Delete", onDeleteAccountRequested, danger = true)
                 }
             }
 
             Fold("If something went wrong") {
                 AcctRow(
-                    "Couldn't be sent",
+                    "Changes the server refused",
                     if (state.deadLetterCount == 0) {
-                        "Nothing stuck — everything went through"
+                        "None. Everything went through."
                     } else {
-                        "${state.deadLetterCount} refused by the server, not retried"
+                        "${state.deadLetterCount} refused. These won't be retried."
                     },
                 )
             }

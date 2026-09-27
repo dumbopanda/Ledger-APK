@@ -11,7 +11,7 @@ class DateFieldHintTest {
     @Test
     fun `empty state shows the placeholder copy`() {
         assertEquals(
-            DateFieldHint.Placeholder("Day and month, separated — the year is worked out"),
+            DateFieldHint.Placeholder("Day and month, like 5.9. Ledger works out the year."),
             computeDateFieldHint(DateFieldState.Empty, today),
         )
     }
@@ -42,7 +42,7 @@ class DateFieldHintTest {
         val date = LocalDate.of(2025, 12, 25)
         val state = DateFieldState.Resolved(date, yearInferred = true, daysAgo = 273)
         assertEquals(
-            DateFieldHint.Warning("Thu 25 Dec 2025 — last year"),
+            DateFieldHint.Warning("Thu 25 Dec 2025, last year"),
             computeDateFieldHint(state, today),
         )
     }
@@ -54,7 +54,7 @@ class DateFieldHintTest {
         val date = LocalDate.of(2026, 3, 3)
         val state = DateFieldState.Resolved(date, yearInferred = false, daysAgo = 104)
         assertEquals(
-            DateFieldHint.Warning("Tue 3 Mar 2026 — 104 days ago"),
+            DateFieldHint.Warning("Tue 3 Mar 2026, 104 days ago"),
             computeDateFieldHint(state, today),
         )
     }
@@ -66,7 +66,7 @@ class DateFieldHintTest {
         val date = LocalDate.of(2025, 12, 25)
         val state = DateFieldState.Resolved(date, yearInferred = false, daysAgo = 273)
         assertEquals(
-            DateFieldHint.Warning("Thu 25 Dec 2025 — 273 days ago"),
+            DateFieldHint.Warning("Thu 25 Dec 2025, 273 days ago"),
             computeDateFieldHint(state, today),
         )
     }

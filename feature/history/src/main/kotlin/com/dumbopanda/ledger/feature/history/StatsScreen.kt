@@ -96,7 +96,7 @@ internal fun StatsScreen(
                     if (state.balances.size <= 3) BalanceGrid(state.balances) else AccountsPanel(state.balances)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         StatTile("Total spend", state.totalSpendMinor, Modifier.weight(1f))
-                        StatTile("Total have", state.totalHaveMinor, Modifier.weight(1f), dark = true)
+                        StatTile("Across accounts", state.totalHaveMinor, Modifier.weight(1f), dark = true)
                     }
                     BreakdownPanel(state, onBreakdown, onShowAll)
                     FactsPanel(state.facts)

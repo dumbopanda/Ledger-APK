@@ -169,7 +169,7 @@ private fun AppHeader(
 
         if (home.showBackupBar) {
             LedgerNoticeBar(Mint, Modifier.padding(start = 20.dp, end = 20.dp, top = 10.dp)) {
-                Text("Back up today's entries", style = webText(13f, FontWeight.SemiBold), modifier = Modifier.weight(1f))
+                Text("Keep a copy in your own files too?", style = webText(13f, FontWeight.SemiBold), modifier = Modifier.weight(1f))
                 Text(
                     "Later",
                     style = webText(13f, FontWeight.Bold, TextMuted),
@@ -203,11 +203,11 @@ private fun AppHeader(
 @Composable
 private fun SyncBar(home: HomeUiState, onSendNow: () -> Unit) {
     val n = home.pendingCount
-    val held = if (n == 1) "1 entry saved on this device" else "$n entries saved on this device"
+    val changes = if (n == 1) "1 change" else "$n changes"
     val label = when {
-        !home.online -> "$held — offline"
-        home.syncMode == SyncMode.SMART && n < 3 -> "$held — waiting for company"
-        else -> held
+        !home.online -> "$changes not backed up yet. You're offline."
+        home.syncMode == SyncMode.MANUAL -> "$changes not backed up yet."
+        else -> "$changes not backed up yet. Going up shortly."
     }
     LedgerNoticeBar(
         fill = if (home.online) Mint else CanvasLight,
@@ -217,7 +217,7 @@ private fun SyncBar(home: HomeUiState, onSendNow: () -> Unit) {
         Box(Modifier.size(8.dp).background(if (home.online) Forest else TextMuted, CircleShape))
         Text(label, style = webText(13f, FontWeight.SemiBold), modifier = Modifier.weight(1f))
         LedgerBarButton(
-            text = if (home.online) "Send now" else "Waiting for signal",
+            text = if (home.online) "Back up now" else "Offline",
             onClick = onSendNow,
             fill = Forest,
             ink = White,

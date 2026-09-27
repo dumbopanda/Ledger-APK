@@ -21,6 +21,9 @@ sealed interface EntryUiState {
         val dateText: TextFieldValue,
         val dateFieldState: DateFieldState,
         val quickDate: QuickDate?,
+        // The date defaulted to yesterday because it's before 5:30 am -- said out loud, since
+        // otherwise it reads like a stale date (it did, in testing).
+        val lateNightDefault: Boolean = false,
         val accounts: List<Account>,
         // Every name any entry has used, most-used first -- the Transaction name dropdown.
         val knownNames: List<String>,
@@ -55,4 +58,7 @@ sealed interface EntryEvent {
 
     // A blocked save puts the caret in the field that stopped it (the web's `el.focus()`).
     data class FocusField(val field: DraftField) : EntryEvent
+
+    // A new entry was saved -- the form resets, so the keyboard has nothing left to type into.
+    data object Saved : EntryEvent
 }

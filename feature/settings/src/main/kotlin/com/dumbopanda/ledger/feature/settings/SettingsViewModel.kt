@@ -69,6 +69,8 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     private val accounts = accountRepository.activeAccounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private val online = connectivityChecker.onlineFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), connectivityChecker.isOnline())
 
     private var showSignOutGuard = false
     private var signingOut = false
@@ -89,7 +91,7 @@ class SettingsViewModel @Inject constructor(
             combine(syncMode, showAmounts, requireBiometric, pendingCount, oldestPending) { _, _, _, _, _ -> }.collect { publish() }
         }
         viewModelScope.launch {
-            combine(deadLetterCount, entryCount, lastBackupAt, accounts) { _, _, _, _ -> }.collect { publish() }
+            combine(deadLetterCount, entryCount, lastBackupAt, accounts, online) { _, _, _, _, _ -> }.collect { publish() }
         }
     }
 
@@ -121,9 +123,9 @@ class SettingsViewModel @Inject constructor(
         publish()
         viewModelScope.launch {
             val message = when (backupRepository.exportTo(uri)) {
-                is ExportOutcome.Success -> "Backup saved"
-                ExportOutcome.NotSignedIn -> "Sign in before backing up"
-                ExportOutcome.WriteError -> "That file could not be written"
+                is ExportOutcome.Success -> "File saved"
+                ExportOutcome.NotSignedIn -> "Sign in before saving a file."
+                ExportOutcome.WriteError -> "That file couldn't be saved."
             }
             exporting = false
             _events.tryEmit(message)
@@ -136,16 +138,18 @@ class SettingsViewModel @Inject constructor(
         publish()
         viewModelScope.launch {
             val message = when (val outcome = backupRepository.importFrom(uri)) {
-                is ImportOutcome.Success ->
+                is ImportOutcome.Success -> {
+                    val skipped = if (outcome.skipped > 0) " Skipped ${outcome.skipped} that didn't look right." else ""
                     if (outcome.accountsAdded == 0 && outcome.entriesAdded == 0) {
-                        "Everything in that file was already here"
+                        "Everything in that file was already here.$skipped"
                     } else {
-                        "Restored ${outcome.entriesAdded} ${if (outcome.entriesAdded == 1) "entry" else "entries"}"
+                        "Restored ${outcome.entriesAdded} ${if (outcome.entriesAdded == 1) "entry" else "entries"}.$skipped"
                     }
-                is ImportOutcome.UserMismatch -> "That backup belongs to a different account"
-                ImportOutcome.NotSignedIn -> "Sign in before restoring"
-                ImportOutcome.InvalidFile -> "That is not a Ledger backup"
-                ImportOutcome.ReadError -> "That file could not be read"
+                }
+                is ImportOutcome.UserMismatch -> "That file belongs to a different account."
+                ImportOutcome.NotSignedIn -> "Sign in before restoring."
+                ImportOutcome.InvalidFile -> "That isn't a Ledger file, or it's damaged."
+                ImportOutcome.ReadError -> "That file couldn't be opened."
             }
             importing = false
             _events.tryEmit(message)
@@ -172,19 +176,19 @@ class SettingsViewModel @Inject constructor(
     // its initialiser first calls this.
     private fun build(): SettingsUiState {
         val n = pendingCount.value
-        val online = connectivityChecker.isOnline()
+        val online = this.online.value
         val mode = syncMode.value
         return SettingsUiState(
             syncMode = mode,
             pendingOpCount = n,
             deadLetterCount = deadLetterCount.value,
             queueSummary = queueSummary(n, online, mode),
-            sendLabel = if (!online && n > 0) "Offline" else "Send",
+            sendLabel = if (!online && n > 0) "Offline" else "Back up",
             sendEnabled = n > 0 && online,
             syncModeHint = when (mode) {
-                SyncMode.INSTANT -> "Each entry goes on its own."
-                SyncMode.MANUAL -> "Nothing leaves until you tap Send."
-                SyncMode.SMART -> "$BATCH_FULL+ go together once you stop adding. Never held over an hour."
+                SyncMode.INSTANT -> "Each change goes up the moment you save it."
+                SyncMode.MANUAL -> "Nothing leaves this phone until you tap Back up."
+                SyncMode.SMART -> "Waits for a pause, then sends a few changes together. Never more than an hour. Easy on battery and data."
             },
             backupStatus = backupStatus(),
             accountCount = accounts.value.size,
@@ -200,25 +204,25 @@ class SettingsViewModel @Inject constructor(
 
     // index.html's whenText().
     private fun queueSummary(n: Int, online: Boolean, mode: SyncMode): String {
-        if (n == 0) return "Nothing waiting"
-        val count = if (n == 1) "1 entry" else "$n entries"
-        if (!online) return "$count · offline"
+        if (n == 0) return "All backed up"
+        val count = if (n == 1) "1 change" else "$n changes"
+        if (!online) return "$count · sends when you're back online"
         return when {
-            mode == SyncMode.MANUAL -> "$count · waiting for you"
-            mode == SyncMode.INSTANT -> "$count · retrying"
-            n >= BATCH_FULL -> "$count · going shortly"
+            mode == SyncMode.MANUAL -> "$count · tap Back up"
+            mode == SyncMode.INSTANT -> "$count · trying again"
+            n >= BATCH_FULL -> "$count · sending shortly"
             else -> oldestPending.value
                 ?.plusSeconds(CEILING_SECONDS)
                 ?.atZone(ZoneId.systemDefault())
-                ?.let { "$count · by ${it.format(TIME)}" }
-                ?: "$count · waiting for company"
+                ?.let { "$count · sending by ${it.format(TIME)}" }
+                ?: "$count · sending soon"
         }
     }
 
     private fun backupStatus(): String {
         val n = entryCount.value
         val count = if (n == 1) "1 entry" else "$n entries"
-        val last = lastBackupAt.value ?: return "$count · never backed up"
-        return "$count · ${last.atZone(ZoneId.systemDefault()).format(STAMP)}"
+        val last = lastBackupAt.value ?: return "$count · no file saved yet"
+        return "$count · file saved ${last.atZone(ZoneId.systemDefault()).format(STAMP)}"
     }
 }

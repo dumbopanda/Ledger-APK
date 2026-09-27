@@ -6,7 +6,12 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -84,12 +89,14 @@ fun EntryRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toast = LocalLedgerToast.current
     val focus = remember { EntryFocus() }
+    val focusManager = LocalFocusManager.current
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
                 is EntryEvent.Toast -> toast.show(event.message, event.durationMs)
                 EntryEvent.EditSaved -> onEditSaved()
                 is EntryEvent.FocusField -> focus.request(event.field, uiState)
+                EntryEvent.Saved -> focusManager.clearFocus()
             }
         }
     }
@@ -108,7 +115,7 @@ internal fun EntryScreen(
         when (uiState) {
             EntryUiState.Loading -> Unit
             EntryUiState.NoAccounts -> Text(
-                "Add an account first — there's nowhere to record this until one exists.",
+                "Add an account first. There's nowhere to record this until one exists.",
                 style = webText(14f, FontWeight.Medium, TextMuted),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 40.dp),
@@ -140,7 +147,7 @@ private fun EntryForm(state: EntryUiState.Ready, onAction: (EntryAction) -> Unit
             onDirectionChange = { onAction(EntryAction.DirectionChanged(it)) },
             selfTransfer = draft.selfTransfer,
             invalid = state.invalid == DraftField.AMOUNT,
-            inputModifier = Modifier.focusRequester(focus.amount),
+            inputModifier = Modifier.focusRequester(focus.amount).bringIntoViewRequester(focus.amountView),
         )
 
         // 2 · WHICH ACCOUNT -- Self transfer sits top-right of the card, not in the flow.
@@ -198,8 +205,15 @@ private fun EntryForm(state: EntryUiState.Ready, onAction: (EntryAction) -> Unit
                 onQuickPick = { onAction(EntryAction.DateQuickPicked(it)) },
                 invalid = state.invalid == DraftField.DATE,
                 modifier = Modifier.padding(start = GroupInset),
-                inputModifier = Modifier.focusRequester(focus.date),
+                inputModifier = Modifier.focusRequester(focus.date).bringIntoViewRequester(focus.dateView),
             )
+            if (state.lateNightDefault) {
+                Text(
+                    "It's before 5:30 am, so Ledger files this under yesterday. Tap Today to change it.",
+                    style = webText(12f, FontWeight.Medium, TextMuted, lineHeight = 17f),
+                    modifier = Modifier.padding(start = GroupInset),
+                )
+            }
             if (draft.selfTransfer) {
                 SplitCategories(draft.sentLegType, draft.receivedLegType, onAction)
             } else {
@@ -284,10 +298,10 @@ private fun NameCombo(state: EntryUiState.Ready, onAction: (EntryAction) -> Unit
 private fun SplitCategories(sent: String, received: String, onAction: (EntryAction) -> Unit) {
     Column(Modifier.padding(start = GroupInset), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            LedgerField("Sent leg category", Modifier.weight(1f)) {
+            LedgerField("Category, money out", Modifier.weight(1f)) {
                 LegCategorySelect(sent, { onAction(EntryAction.SentLegTypeChanged(it)) })
             }
-            LedgerField("Received leg category", Modifier.weight(1f)) {
+            LedgerField("Category, money in", Modifier.weight(1f)) {
                 LegCategorySelect(received, { onAction(EntryAction.ReceivedLegTypeChanged(it)) })
             }
         }
@@ -356,16 +370,21 @@ private fun ConfirmSheet(content: ConfirmSheetContent, saving: Boolean, onAction
 }
 
 /** The three fields a blocked save can point at, so the caret lands where the problem is. */
+@OptIn(ExperimentalFoundationApi::class)
 internal class EntryFocus {
     val amount = FocusRequester()
     val date = FocusRequester()
     val name = FocusRequester()
+    val amountView = BringIntoViewRequester()
+    val dateView = BringIntoViewRequester()
 
-    fun request(field: DraftField, state: EntryUiState) {
+    // Focus alone left the amount scrolled off the top once the keyboard opened (seen live),
+    // so the field is brought back into view after the keyboard has had time to push the page.
+    suspend fun request(field: DraftField, state: EntryUiState) {
         if (state !is EntryUiState.Ready) return
         when (field) {
-            DraftField.AMOUNT -> amount.requestFocus()
-            DraftField.DATE -> date.requestFocus()
+            DraftField.AMOUNT -> { amount.requestFocus(); delay(KEYBOARD_SETTLE_MS); amountView.bringIntoView() }
+            DraftField.DATE -> { date.requestFocus(); delay(KEYBOARD_SETTLE_MS); dateView.bringIntoView() }
             // A picked name is a dropdown, not a text box -- its red border is the pointer.
             // Only the typed "Name this one" input can take the caret.
             DraftField.NAME -> if (state.nameCustomMode) name.requestFocus()
@@ -381,3 +400,5 @@ private fun Modifier.offsetUp(dp: Int): Modifier = this.then(
         layout(placeable.width, (placeable.height - shift).coerceAtLeast(0)) { placeable.place(0, -shift) }
     },
 )
+
+private const val KEYBOARD_SETTLE_MS = 350L
