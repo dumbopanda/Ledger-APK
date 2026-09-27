@@ -14,6 +14,7 @@ import com.dumbopanda.ledger.core.domain.GroupOwedToMeUseCase
 import com.dumbopanda.ledger.core.domain.OwedToMeItem
 import com.dumbopanda.ledger.core.model.Account
 import com.dumbopanda.ledger.core.model.Entry
+import com.dumbopanda.ledger.core.model.isOpeningBalance
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -61,7 +62,9 @@ class HistoryViewModel @Inject constructor(
     private val accounts: StateFlow<List<Account>> = accountRepository.allAccounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    // Opening balances are set and shown in Settings > Accounts, not listed as things that happened.
     private val monthEntries: StateFlow<List<Entry>> = month.flatMapLatest { historyRepository.entriesInMonth(it) }
+        .map { entries -> entries.filterNot { it.isOpeningBalance } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // Every live Y leg, raw -- the Owed-to-me list and the detail sheet's Open/Close toggle,
