@@ -69,3 +69,11 @@ fun monthSub(offset: Int): String = when (offset) {
     -1 -> "Last month"
     else -> "${-offset} months ago"
 }
+
+/** Typing into a plain amount box: digits and one point, up to ₹99,99,999.99 (the server's cap). */
+fun sanitizeAmountInput(raw: String): String {
+    val kept = raw.filter { it.isDigit() || it == '.' }
+    val dot = kept.indexOf('.')
+    if (dot == -1) return kept.take(7)
+    return kept.substring(0, dot).take(7) + "." + kept.substring(dot + 1).replace(".", "").take(2)
+}

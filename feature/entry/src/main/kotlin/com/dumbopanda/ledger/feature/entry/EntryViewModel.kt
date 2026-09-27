@@ -27,6 +27,7 @@ import com.dumbopanda.ledger.core.domain.formatDisplayDate
 import com.dumbopanda.ledger.core.domain.formatMoney
 import com.dumbopanda.ledger.core.domain.formatMoneyFixed
 import com.dumbopanda.ledger.core.model.Account
+import com.dumbopanda.ledger.core.model.OPENING_BALANCE
 import com.dumbopanda.ledger.core.model.Entry
 import com.dumbopanda.ledger.core.model.Money
 import com.dumbopanda.ledger.core.model.TxnDirection
@@ -481,8 +482,8 @@ class EntryViewModel @Inject constructor(
             quickDate = quickDate,
             lateNightDefault = lateNightDefault,
             accounts = accounts.value,
-            // "Self Transfer" is the transfer toggle's own name, not one to pick for a payment.
-            knownNames = if (d.selfTransfer) knownNames.value else knownNames.value.filterNot { it == "Self Transfer" },
+            // "Self Transfer" and "Opening balance" are the app's own names, not ones to pick for a payment.
+            knownNames = knownNames.value.filterNot { it == OPENING_BALANCE || (!d.selfTransfer && it == "Self Transfer") },
             nameCustomMode = nameCustomMode,
             openItems = openItems.value,
             backOld = backOld,

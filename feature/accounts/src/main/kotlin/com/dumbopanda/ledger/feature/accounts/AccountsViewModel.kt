@@ -3,7 +3,10 @@ package com.dumbopanda.ledger.feature.accounts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dumbopanda.ledger.core.data.repository.AccountRepository
+import com.dumbopanda.ledger.core.data.repository.EntryRepository
 import com.dumbopanda.ledger.core.domain.AccountNameValidation
+import com.dumbopanda.ledger.core.domain.cleanToMinor
+import com.dumbopanda.ledger.core.domain.sanitizeAmountInput
 import com.dumbopanda.ledger.core.domain.validateAccountName
 import com.dumbopanda.ledger.core.model.Account
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlin.math.abs
 import javax.inject.Inject
 
 /**
@@ -28,6 +32,7 @@ import javax.inject.Inject
 @HiltViewModel
 class AccountsViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
+    private val entryRepository: EntryRepository,
 ) : ViewModel() {
 
     private val accounts: StateFlow<List<Account>> = accountRepository.allAccounts()
@@ -40,6 +45,10 @@ class AccountsViewModel @Inject constructor(
     private var newName = ""
     private var newNameError: String? = null
     private var archiveNotice: String? = null
+    private var openingBalances: Map<String, Long> = emptyMap()
+    private var balanceEditingId: String? = null
+    private var balanceText = ""
+    private var balanceOwed = false
 
     private val _uiState = MutableStateFlow<AccountsUiState>(AccountsUiState.Loading)
     val uiState: StateFlow<AccountsUiState> = _uiState.asStateFlow()
@@ -48,6 +57,12 @@ class AccountsViewModel @Inject constructor(
         // C15: no ensureSeeded() fallback here anymore -- see EntryViewModel's own note. Same
         // race against AccountSetupOverlay, same fix.
         viewModelScope.launch { accounts.collect { publish(it) } }
+        viewModelScope.launch {
+            entryRepository.openingBalances().collect {
+                openingBalances = it
+                publish(accounts.value)
+            }
+        }
     }
 
     fun onAction(action: AccountsAction) {
@@ -85,6 +100,23 @@ class AccountsViewModel @Inject constructor(
                 newNameError = null
             }
             AccountsAction.AddConfirmed -> confirmAdd()
+            is AccountsAction.BalanceTapped -> {
+                val current = openingBalances[action.account.id] ?: 0L
+                balanceEditingId = action.account.id
+                balanceOwed = current < 0
+                balanceText = if (current == 0L) "" else formatPlain(abs(current))
+            }
+            is AccountsAction.BalanceTextChanged -> balanceText = sanitizeAmountInput(action.text)
+            is AccountsAction.BalanceOwedChanged -> balanceOwed = action.owed
+            AccountsAction.BalanceCancelled -> balanceEditingId = null
+            AccountsAction.BalanceConfirmed -> {
+                val id = balanceEditingId
+                if (id != null) {
+                    val minor = cleanToMinor(balanceText) ?: 0L
+                    viewModelScope.launch { entryRepository.setOpeningBalance(id, if (balanceOwed) -minor else minor) }
+                }
+                balanceEditingId = null
+            }
         }
         publish(accounts.value)
     }
@@ -156,9 +188,17 @@ class AccountsViewModel @Inject constructor(
             newName = newName,
             newNameError = newNameError,
             archiveNotice = archiveNotice,
+            openingBalances = openingBalances,
+            balanceEditingId = balanceEditingId,
+            balanceText = balanceText,
+            balanceOwed = balanceOwed,
         )
     }
 }
 
 // Matches the server's check on accounts.name (0002_accounts.sql).
 private const val MAX_ACCOUNT_NAME = 40
+
+// "5000" or "5000.50" -- what the edit box shows, without grouping commas.
+private fun formatPlain(minor: Long): String =
+    if (minor % 100 == 0L) (minor / 100).toString() else "${minor / 100}.${(minor % 100).toString().padStart(2, '0')}"

@@ -11,6 +11,16 @@ import com.dumbopanda.ledger.core.data.sync.OpLog
 import com.dumbopanda.ledger.core.data.sync.SyncScheduler
 import com.dumbopanda.ledger.core.database.LedgerDatabase
 import com.dumbopanda.ledger.core.model.Entry
+import com.dumbopanda.ledger.core.model.Money
+import com.dumbopanda.ledger.core.model.OPENING_BALANCE
+import com.dumbopanda.ledger.core.model.TxnDirection
+import com.dumbopanda.ledger.core.model.TxnFrequency
+import com.dumbopanda.ledger.core.model.TxnId
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import java.time.ZoneId
+import java.util.UUID
+import kotlin.math.abs
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -72,6 +82,50 @@ class EntryRepository @Inject constructor(
     suspend fun deleteEntry(id: String) {
         val anyQueued = deleteEntry(sessionDatabaseHolder.database(), clock, id)
         if (anyQueued) notifySync()
+    }
+
+    // Signed opening balance per account id: money in it (+) or owed on it (-), e.g. a credit card.
+    fun openingBalances(): Flow<Map<String, Long>> =
+        sessionDatabaseHolder.database().entryDao().observeByType(OPENING_BALANCE).map { rows ->
+            rows.map { it.toDomain() }.associate { e ->
+                e.accountId to if (e.direction == TxnDirection.Credit) e.amount.minor else -e.amount.minor
+            }
+        }
+
+    // Dated on the account's earliest real entry (today if it has none), so every month's
+    // balance -- not just this one's -- starts from the right number. Zero removes it.
+    suspend fun setOpeningBalance(accountId: String, signedMinor: Long) {
+        val dao = sessionDatabaseHolder.database().entryDao()
+        val existing = dao.findByAccountAndType(accountId, OPENING_BALANCE)?.toDomain()
+        if (signedMinor == 0L) {
+            if (existing != null) deleteEntry(existing.id)
+            return
+        }
+        val today = clock.now().atZone(ZoneId.systemDefault()).toLocalDate()
+        val date = dao.earliestDateFor(accountId, OPENING_BALANCE)?.let { minOf(it, today) } ?: today
+        val direction = if (signedMinor > 0) TxnDirection.Credit else TxnDirection.Debit
+        val amount = Money(abs(signedMinor))
+        if (existing != null) {
+            updateEntry(existing.copy(amount = amount, direction = direction, entryDate = minOf(existing.entryDate, date)))
+        } else {
+            addEntry(
+                Entry(
+                    id = UUID.randomUUID().toString(),
+                    clientUid = UUID.randomUUID().toString(),
+                    entryDate = date,
+                    txnId = TxnId("N" + (1..6).map { TXN_ALPHABET.random() }.joinToString("")),
+                    accountId = accountId,
+                    expenseName = OPENING_BALANCE,
+                    moreInfo = null,
+                    txnType = OPENING_BALANCE,
+                    txnFreq = TxnFrequency.Monthly,
+                    amount = amount,
+                    direction = direction,
+                    transferGroup = null,
+                    createdAt = clock.now(),
+                ),
+            )
+        }
     }
 
     // §7.10's From/To account display for a transfer leg -- a one-off lookup, not reactive
@@ -162,3 +216,5 @@ internal suspend fun deleteEntry(db: LedgerDatabase, clock: LedgerClock, id: Str
     }
     return anyQueued
 }
+
+private const val TXN_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"

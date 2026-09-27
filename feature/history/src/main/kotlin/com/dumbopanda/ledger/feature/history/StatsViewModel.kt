@@ -10,6 +10,8 @@ import com.dumbopanda.ledger.core.domain.OwedToMeItem
 import com.dumbopanda.ledger.core.domain.formatMoney
 import com.dumbopanda.ledger.core.model.Account
 import com.dumbopanda.ledger.core.model.Entry
+import com.dumbopanda.ledger.core.model.isLoanLeg
+import com.dumbopanda.ledger.core.model.isOpeningBalance
 import com.dumbopanda.ledger.core.model.TxnDirection
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -118,8 +120,11 @@ class StatsViewModel @Inject constructor(
         val accs = accounts.value
         val bal = balances.value
         val byId = accs.associateBy { it.id }
-        val spend = rows.filter { it.transferGroup == null && it.direction == TxnDirection.Debit }
-        val income = rows.filter { it.transferGroup == null && it.direction == TxnDirection.Credit }
+        // Only real spending and income: not your own money moving (transfers), not a loan going
+        // out or coming back, not an account's starting balance. Balances still count all three.
+        val flows = rows.filter { it.transferGroup == null && !it.isLoanLeg && !it.isOpeningBalance }
+        val spend = flows.filter { it.direction == TxnDirection.Debit }
+        val income = flows.filter { it.direction == TxnDirection.Credit }
         val totalSpend = spend.sumOf { it.amount.minor }
 
         // Every live account gets a tile; an archived one only while it still holds money.
@@ -156,7 +161,8 @@ class StatsViewModel @Inject constructor(
             showAllGroups = showAll.value,
             groups = groups,
             facts = listOf(
-                "Entries" to rows.size.toString(),
+                // A transfer is one thing that happened, not its two stored rows.
+                "Entries" to rows.filterNot { it.isOpeningBalance }.distinctBy { it.transferGroup ?: it.id }.size.toString(),
                 "Money in" to "₹${formatMoney(income.sumOf { it.amount.minor })}",
                 "Biggest expense" to (biggest?.let { "${it.expenseName} · ₹${formatMoney(it.amount.minor)}" } ?: "None yet"),
                 "Daily average" to "₹${formatMoney(perDayRupees * 100)} over $elapsed ${if (elapsed == 1) "day" else "days"}",

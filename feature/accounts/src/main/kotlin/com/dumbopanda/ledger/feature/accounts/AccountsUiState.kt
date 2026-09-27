@@ -16,5 +16,10 @@ sealed interface AccountsUiState {
         val newName: String,
         val newNameError: String?,
         val archiveNotice: String? = null,
+        // Signed opening balance per account id (negative = owed on it, e.g. a credit card).
+        val openingBalances: Map<String, Long> = emptyMap(),
+        val balanceEditingId: String? = null,
+        val balanceText: String = "",
+        val balanceOwed: Boolean = false,
     ) : AccountsUiState
 }

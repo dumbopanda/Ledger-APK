@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -34,6 +35,7 @@ import com.dumbopanda.ledger.core.designsystem.component.LedgerMiniButton
 import com.dumbopanda.ledger.core.designsystem.component.webBorder
 import com.dumbopanda.ledger.core.designsystem.component.webClickable
 import com.dumbopanda.ledger.core.designsystem.webText
+import com.dumbopanda.ledger.core.domain.formatMoney
 import com.dumbopanda.ledger.core.model.Account
 
 /**
@@ -84,7 +86,8 @@ private fun AccountsPanel(state: AccountsUiState.Ready, onAction: (AccountsActio
             if (state.editingId == account.id) {
                 EditRow(state.editingText, state.editingError, onAction)
             } else {
-                AccountRow(account, isFirst = index == 0, isLast = index == state.accounts.lastIndex, onAction)
+                AccountRow(account, isFirst = index == 0, isLast = index == state.accounts.lastIndex, state.openingBalances[account.id] ?: 0L, onAction)
+                if (state.balanceEditingId == account.id) BalanceEditor(state, onAction)
             }
         }
     }
@@ -92,7 +95,7 @@ private fun AccountsPanel(state: AccountsUiState.Ready, onAction: (AccountsActio
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AccountRow(account: Account, isFirst: Boolean, isLast: Boolean, onAction: (AccountsAction) -> Unit) {
+private fun AccountRow(account: Account, isFirst: Boolean, isLast: Boolean, opening: Long, onAction: (AccountsAction) -> Unit) {
     // Name on its own line, buttons wrapping beneath: side by side, four buttons squeezed a
     // long name to one letter per line at large text sizes (seen live at 1.5x).
     Column(
@@ -102,11 +105,19 @@ private fun AccountRow(account: Account, isFirst: Boolean, isLast: Boolean, onAc
         Column(Modifier.alpha(if (account.isArchived) 0.55f else 1f)) {
             Text(account.name, style = webText(15f, FontWeight.SemiBold))
             if (account.isArchived) Text("Archived", style = webText(12f, FontWeight.Medium, TextMuted), modifier = Modifier.padding(top = 2.dp))
+            if (opening != 0L) {
+                Text(
+                    if (opening > 0) "Started with ₹${formatMoney(opening)}" else "Started owing ₹${formatMoney(-opening)}",
+                    style = webText(12f, FontWeight.Medium, TextMuted),
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             LedgerMiniButton("↑", { onAction(AccountsAction.MoveUp(account)) }, enabled = !isFirst)
             LedgerMiniButton("↓", { onAction(AccountsAction.MoveDown(account)) }, enabled = !isLast)
             LedgerMiniButton("Rename", { onAction(AccountsAction.RenameTapped(account)) })
+            LedgerMiniButton("Balance", { onAction(AccountsAction.BalanceTapped(account)) })
             LedgerMiniButton(if (account.isArchived) "Restore" else "Archive", { onAction(AccountsAction.ArchiveToggled(account)) })
         }
     }
@@ -150,6 +161,27 @@ private fun AddPanel(state: AccountsUiState.Ready, onAction: (AccountsAction) ->
                 }
                 LedgerMiniButton("Add", { onAction(AccountsAction.AddTapped) }, primary = true)
             }
+        }
+    }
+}
+
+// What was in the account when you started with Ledger -- or owed on it, for a credit card.
+@Composable
+private fun BalanceEditor(state: AccountsUiState.Ready, onAction: (AccountsAction) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Balance when you started with Ledger", style = webText(13f, FontWeight.SemiBold))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LedgerMiniButton("Money in it", { onAction(AccountsAction.BalanceOwedChanged(false)) }, primary = !state.balanceOwed)
+            LedgerMiniButton("Owed on it", { onAction(AccountsAction.BalanceOwedChanged(true)) }, primary = state.balanceOwed)
+        }
+        LedgerInput(state.balanceText, { onAction(AccountsAction.BalanceTextChanged(it)) }, placeholder = "₹ 0", keyboardType = KeyboardType.Decimal)
+        Text(
+            "Counts toward this account's balance in Stats. It isn't spending or income.",
+            style = webText(12f, FontWeight.Medium, TextMuted, lineHeight = 17f),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LedgerMiniButton("Cancel", { onAction(AccountsAction.BalanceCancelled) })
+            LedgerMiniButton("Save", { onAction(AccountsAction.BalanceConfirmed) }, primary = true)
         }
     }
 }

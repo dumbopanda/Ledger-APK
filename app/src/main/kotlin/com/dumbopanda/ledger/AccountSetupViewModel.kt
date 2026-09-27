@@ -3,7 +3,10 @@ package com.dumbopanda.ledger
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dumbopanda.ledger.core.data.repository.AccountRepository
+import com.dumbopanda.ledger.core.data.repository.EntryRepository
 import com.dumbopanda.ledger.core.domain.AccountNameValidation
+import com.dumbopanda.ledger.core.domain.cleanToMinor
+import com.dumbopanda.ledger.core.domain.sanitizeAmountInput
 import com.dumbopanda.ledger.core.domain.validateAccountName
 import com.dumbopanda.ledger.core.model.Account
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,7 +17,13 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
 
-data class AccountSetupRow(val id: String = UUID.randomUUID().toString(), val name: String = "", val error: String? = null)
+// balance: what's in the account right now, as typed ("5000", "5000.5"); blank means start at zero.
+data class AccountSetupRow(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String = "",
+    val error: String? = null,
+    val balance: String = "",
+)
 
 sealed interface AccountSetupUiState {
     data object Checking : AccountSetupUiState
@@ -34,6 +43,7 @@ sealed interface AccountSetupUiState {
 @HiltViewModel
 class AccountSetupViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
+    private val entryRepository: EntryRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<AccountSetupUiState>(AccountSetupUiState.Checking)
     val uiState: StateFlow<AccountSetupUiState> = _uiState.asStateFlow()
@@ -52,6 +62,11 @@ class AccountSetupViewModel @Inject constructor(
 
     fun onNameChanged(id: String, name: String) {
         rows = rows.map { if (it.id == id) it.copy(name = name, error = null) else it }
+        _uiState.value = readyState()
+    }
+
+    fun onBalanceChanged(id: String, text: String) {
+        rows = rows.map { if (it.id == id) it.copy(balance = sanitizeAmountInput(text)) else it }
         _uiState.value = readyState()
     }
 
@@ -106,15 +121,16 @@ class AccountSetupViewModel @Inject constructor(
         _uiState.value = AccountSetupUiState.Ready(rows, saving = true)
         viewModelScope.launch {
             toCreate.forEachIndexed { index, row ->
-                accountRepository.addAccount(
-                    Account(
-                        id = UUID.randomUUID().toString(),
-                        clientUid = UUID.randomUUID().toString(),
-                        name = row.name.trim(),
-                        sortOrder = index,
-                        archivedAt = null,
-                    ),
+                val account = Account(
+                    id = UUID.randomUUID().toString(),
+                    clientUid = UUID.randomUUID().toString(),
+                    name = row.name.trim(),
+                    sortOrder = index,
+                    archivedAt = null,
                 )
+                accountRepository.addAccount(account)
+                val opening = cleanToMinor(row.balance) ?: 0L
+                if (opening > 0) entryRepository.setOpeningBalance(account.id, opening)
             }
             _uiState.value = AccountSetupUiState.Done
         }

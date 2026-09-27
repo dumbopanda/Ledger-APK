@@ -52,6 +52,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -88,6 +89,7 @@ fun AccountSetupRoute(onDone: () -> Unit, viewModel: AccountSetupViewModel = hil
     AccountSetupOverlay(
         uiState = uiState,
         onNameChanged = viewModel::onNameChanged,
+        onBalanceChanged = viewModel::onBalanceChanged,
         onAddRow = viewModel::addRow,
         onRemoveRow = viewModel::removeRow,
         onUseSuggestion = viewModel::useSuggestion,
@@ -108,6 +110,7 @@ fun AccountSetupRoute(onDone: () -> Unit, viewModel: AccountSetupViewModel = hil
 internal fun AccountSetupOverlay(
     uiState: AccountSetupUiState,
     onNameChanged: (id: String, name: String) -> Unit,
+    onBalanceChanged: (id: String, text: String) -> Unit,
     onAddRow: () -> Unit,
     onRemoveRow: (id: String) -> Unit,
     onUseSuggestion: (String) -> Unit,
@@ -154,7 +157,7 @@ internal fun AccountSetupOverlay(
                         .verticalScroll(rememberScrollState())
                         .padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 8.dp),
                 ) {
-                    SheetContent(uiState, onNameChanged, onAddRow, onRemoveRow, onUseSuggestion, onConfirm)
+                    SheetContent(uiState, onNameChanged, onBalanceChanged, onAddRow, onRemoveRow, onUseSuggestion, onConfirm)
                 }
                 Box(Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 20.dp)) {
                     LimeButton(
@@ -176,6 +179,7 @@ internal fun AccountSetupOverlay(
 private fun SheetContent(
     uiState: AccountSetupUiState.Ready,
     onNameChanged: (id: String, name: String) -> Unit,
+    onBalanceChanged: (id: String, text: String) -> Unit,
     onAddRow: () -> Unit,
     onRemoveRow: (id: String) -> Unit,
     onUseSuggestion: (String) -> Unit,
@@ -201,6 +205,11 @@ private fun SheetContent(
     Spacer(Modifier.height(22.dp))
 
     Text("Name your accounts", style = webText(15f, FontWeight.Bold, White))
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Add what's in each one right now, so balances start right. Not sure? Leave it blank.",
+        style = webText(13f, FontWeight.Normal, MutedOnDark, lineHeight = 18f),
+    )
     Spacer(Modifier.height(10.dp))
     uiState.rows.forEachIndexed { index, row ->
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -217,6 +226,18 @@ private fun SheetContent(
                         onConfirm()
                     }),
                     description = "Account ${index + 1} name",
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Box(Modifier.width(118.dp)) {
+                FirstRunField(
+                    value = row.balance,
+                    onValueChange = { onBalanceChanged(row.id, it) },
+                    placeholder = "₹ 0",
+                    onDark = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                    description = "Money in account ${index + 1} now",
                 )
             }
             if (uiState.rows.size > 1) {
@@ -280,6 +301,7 @@ private fun AccountSetupOverlayPreview() {
             AccountSetupOverlay(
                 uiState = AccountSetupUiState.Ready(rows = listOf(AccountSetupRow(name = "Cash in hand")), saving = false),
                 onNameChanged = { _, _ -> },
+                onBalanceChanged = { _, _ -> },
                 onAddRow = {},
                 onRemoveRow = {},
                 onUseSuggestion = {},

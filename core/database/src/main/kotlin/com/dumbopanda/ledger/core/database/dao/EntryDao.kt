@@ -100,6 +100,16 @@ interface EntryDao {
     )
     fun inMinorBetween(from: LocalDate, to: LocalDate): Flow<Long>
 
+    // One per account at most -- see OPENING_BALANCE (core:model).
+    @Query("""SELECT * FROM entries WHERE accountId = :accountId AND txnType = :type AND deletedAt IS NULL LIMIT 1""")
+    suspend fun findByAccountAndType(accountId: String, type: String): EntryEntity?
+
+    @Query("""SELECT * FROM entries WHERE txnType = :type AND deletedAt IS NULL""")
+    fun observeByType(type: String): Flow<List<EntryEntity>>
+
+    @Query("""SELECT MIN(entryDate) FROM entries WHERE accountId = :accountId AND txnType != :exceptType AND deletedAt IS NULL""")
+    suspend fun earliestDateFor(accountId: String, exceptType: String): LocalDate?
+
     @Query("""SELECT * FROM entries WHERE id = :id""")
     suspend fun findById(id: String): EntryEntity?
 

@@ -30,3 +30,16 @@ data class Entry(
         private val MIN_ENTRY_DATE: LocalDate = LocalDate.of(2000, 1, 1)
     }
 }
+
+/**
+ * An account's starting balance is stored as one ordinary entry with this name and category, so
+ * it syncs, backs up and counts toward balances like any other -- but it is neither spending nor
+ * income, so Stats leaves it out.
+ */
+const val OPENING_BALANCE = "Opening balance"
+
+val Entry.isOpeningBalance: Boolean get() = txnType == OPENING_BALANCE
+
+// A leg of a loan ("Will I get this back?"): money lent out or coming back. It moves a balance,
+// but it isn't spending or income. A self transfer shares the Y id shape, so it's excluded.
+val Entry.isLoanLeg: Boolean get() = txnId.isY && transferGroup == null
