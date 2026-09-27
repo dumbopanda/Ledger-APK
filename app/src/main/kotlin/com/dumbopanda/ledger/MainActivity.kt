@@ -1,5 +1,6 @@
 package com.dumbopanda.ledger
 
+import android.app.Activity
 import android.os.Bundle
 import android.view.View
 import android.view.ViewTreeObserver
@@ -10,14 +11,26 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import com.dumbopanda.ledger.core.designsystem.CanvasLight
 import com.dumbopanda.ledger.core.designsystem.LedgerUiScale
+import com.dumbopanda.ledger.core.designsystem.LocalSystemChrome
+import com.dumbopanda.ledger.core.designsystem.SystemChromeController
 import com.dumbopanda.ledger.core.designsystem.component.LedgerToastHost
 import com.dumbopanda.ledger.core.designsystem.component.LocalLedgerToast
 import com.dumbopanda.ledger.core.designsystem.component.rememberLedgerToastState
@@ -105,16 +118,36 @@ class MainActivity : FragmentActivity() {
 @Composable
 private fun LedgerRoot(bootViewModel: BootViewModel) {
     val route = bootViewModel.route ?: return // splash screen is still covering this frame
+    val chrome = remember { SystemChromeController() }
+    val view = LocalView.current
+    // White status-bar icons over the first-run flow's dark hero, dark ones everywhere else.
+    SideEffect {
+        val window = (view.context as? Activity)?.window ?: return@SideEffect
+        WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = !chrome.chrome.lightIcons
+            isAppearanceLightNavigationBars = chrome.chrome.bottom == CanvasLight
+        }
+    }
     LedgerTheme {
         // index.html's --ui-scale: 0.9, so every size is the web's own CSS px value.
         LedgerUiScale {
             val toast = rememberLedgerToastState()
-            CompositionLocalProvider(LocalLedgerToast provides toast) {
-                // The cream page runs under the status and navigation bars; content is padded
-                // clear of them (and of the keyboard) so nothing sits where a tap can't land.
-                Box(Modifier.fillMaxSize().background(CanvasLight).safeDrawingPadding()) {
-                    LedgerNavHost(bootRoute = route)
-                    LedgerToastHost(toast)
+            CompositionLocalProvider(LocalLedgerToast provides toast, LocalSystemChrome provides chrome) {
+                // The page runs under the status and navigation bars; content is padded clear of
+                // them (and of the keyboard) so nothing sits where a tap can't land. What shows
+                // behind each bar is the current screen's SystemChrome (cream by default).
+                Box(Modifier.fillMaxSize().background(chrome.chrome.top)) {
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .windowInsetsBottomHeight(WindowInsets.navigationBars)
+                            .background(chrome.chrome.bottom),
+                    )
+                    Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                        LedgerNavHost(bootRoute = route)
+                        LedgerToastHost(toast)
+                    }
                 }
             }
         }

@@ -1,6 +1,9 @@
 package com.dumbopanda.ledger
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -44,15 +47,28 @@ fun LedgerNavHost(bootRoute: BootRoute) {
         composable(LedgerDestinations.RESTORING) {
             BiometricGate {
                 RestoringRoute(
-                    onDone = { navController.navigate(LedgerDestinations.ACCOUNT_SETUP) { popUpTo(0) } },
-                    onContinueOffline = { navController.navigate(LedgerDestinations.ACCOUNT_SETUP) { popUpTo(0) } },
+                    onDone = { navController.navigate(LedgerDestinations.PROFILE_SETUP) { popUpTo(0) } },
+                    onContinueOffline = { navController.navigate(LedgerDestinations.PROFILE_SETUP) { popUpTo(0) } },
                 )
             }
         }
 
-        composable(LedgerDestinations.ACCOUNT_SETUP) {
+        // C14: "tell us about yourself" -- between Restoring and the app tour, same
+        // once-per-new-account shape as Account setup itself.
+        composable(LedgerDestinations.PROFILE_SETUP) {
             BiometricGate {
-                AccountSetupRoute(
+                ProfileSetupRoute(
+                    onDone = { navController.navigate(LedgerDestinations.APP_TOUR) { popUpTo(0) } },
+                )
+            }
+        }
+
+        // C15: the owner's own instruction -- show new users how the app works BEFORE asking
+        // them to name accounts, not after. Same once-per-new-account gate as Account setup.
+        // Lands straight on HOME -- Account setup is no longer its own destination (see there).
+        composable(LedgerDestinations.APP_TOUR) {
+            BiometricGate {
+                AppTourRoute(
                     onDone = { navController.navigate(LedgerDestinations.HOME) { popUpTo(0) } },
                 )
             }
@@ -60,11 +76,19 @@ fun LedgerNavHost(bootRoute: BootRoute) {
 
         composable(LedgerDestinations.HOME) {
             BiometricGate {
-                HomeScreen(
-                    sessionExpiredNote = false,
-                    onSignedOut = { navController.navigateToSignInFresh() },
-                    onDeleteAccountRequested = { navController.navigate(LedgerDestinations.DELETE_ACCOUNT) },
-                )
+                // C15: Account setup used to be its own full-screen destination between App
+                // tour and here. It's a popup now, over this same Home -- Home is already the
+                // real screen a brand-new account will use, so it renders (dimmed, inert)
+                // underneath instead of a blank page. AccountSetupRoute renders nothing once an
+                // account has any accounts (its own AlreadyHasAccounts/Done gate).
+                Box(Modifier.fillMaxSize()) {
+                    HomeScreen(
+                        sessionExpiredNote = false,
+                        onSignedOut = { navController.navigateToSignInFresh() },
+                        onDeleteAccountRequested = { navController.navigate(LedgerDestinations.DELETE_ACCOUNT) },
+                    )
+                    AccountSetupRoute(onDone = {})
+                }
             }
         }
 

@@ -230,7 +230,7 @@ max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+otp_expiry = 300
 
 # Use a production-ready SMTP server
 # [auth.email.smtp]
@@ -424,3 +424,11 @@ entrypoint = "./functions/delete-account/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/delete-account/*.html" ]
+
+# Public by design: callers have no session yet (that's what it's for), and the
+# app's sb_publishable_ key isn't a JWT. Abuse limits live in otp_issue/otp_check.
+[functions.email-otp]
+enabled = true
+verify_jwt = false
+import_map = "./functions/email-otp/deno.json"
+entrypoint = "./functions/email-otp/index.ts"

@@ -2,145 +2,66 @@ package com.dumbopanda.ledger.feature.auth
 
 import android.content.Intent
 import android.provider.Settings
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.dumbopanda.ledger.core.designsystem.LedgerTheme
-import com.dumbopanda.ledger.core.designsystem.component.LedgerBanner
-import com.dumbopanda.ledger.core.designsystem.component.LedgerBannerTone
-import com.dumbopanda.ledger.core.designsystem.component.LedgerPillButton
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dumbopanda.ledger.core.designsystem.SystemChrome
+import com.dumbopanda.ledger.core.designsystem.SystemChromeEffect
 
+/**
+ * The SIGN_IN / SIGN_IN_EXPIRED destination: one screen for both ways in. Email (a 6-digit code,
+ * [EmailSignInViewModel]) leads; Google ([SignInViewModel], the same Credential Manager flow as
+ * before) sits under it. Sign in vs Sign up is only framing -- the first verified code creates
+ * the account either way -- so [AuthMode] lives here as UI state, not in either view model.
+ */
 @Composable
 fun SignInRoute(
     onSignedIn: () -> Unit,
     sessionExpiredNote: Boolean = false,
     viewModel: SignInViewModel = hiltViewModel(),
+    emailViewModel: EmailSignInViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val googleState by viewModel.uiState.collectAsStateWithLifecycle()
+    val emailState by emailViewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // Sign up leads for everyone arriving fresh. Only a session-expired return -- someone who
+    // was signed in on this very phone minutes ago -- opens on Sign in.
+    var mode by rememberSaveable { mutableStateOf(if (sessionExpiredNote) AuthMode.SignIn else AuthMode.SignUp) }
 
-    // §7.1 row 2's boot-time refresh failure lands here with sessionExpiredNote = true; a
-    // fresh sign-in from Onboarding passes false. Was a direct call in the composable body
-    // before NavHost wiring existed (harmless when it only flipped a local boolean) -- now
-    // that onSignedIn navigates, an un-gated call on every recomposition of Success would
-    // push duplicate back-stack entries, so it's gated to fire once per Success transition.
-    LaunchedEffect(uiState) {
-        if (uiState is SignInUiState.Success) onSignedIn()
+    SystemChromeEffect(SystemChrome.DarkOverCream)
+    // Back from the code screen returns to the email screen, not out of sign-in.
+    BackHandler(enabled = emailState is EmailSignInUiState.EnteringCode) { emailViewModel.changeEmail() }
+
+    // Gated to fire once per Success transition: onSignedIn navigates, and an un-gated call on
+    // every recomposition would push duplicate back-stack entries.
+    LaunchedEffect(googleState) {
+        if (googleState is SignInUiState.Success) onSignedIn()
+    }
+    LaunchedEffect(emailState) {
+        if (emailState is EmailSignInUiState.Success) onSignedIn()
     }
 
-    SignInScreen(
-        uiState = uiState,
+    AuthScreen(
+        mode = mode,
+        googleState = googleState,
+        emailState = emailState,
         sessionExpiredNote = sessionExpiredNote,
+        onModeChange = { mode = it },
+        onNameChanged = emailViewModel::onNameChanged,
+        onEmailChanged = emailViewModel::onEmailChanged,
+        onSendCode = { emailViewModel.sendCode(signUp = mode == AuthMode.SignUp) },
+        onCodeChanged = emailViewModel::onCodeChanged,
+        onVerify = emailViewModel::verifyCode,
+        onResend = emailViewModel::resendCode,
+        onChangeEmail = emailViewModel::changeEmail,
         onContinueWithGoogle = { viewModel.signIn(context) },
-        onOpenAddAccountSettings = {
-            context.startActivity(Intent(Settings.ACTION_ADD_ACCOUNT))
-        },
+        onOpenAddAccountSettings = { context.startActivity(Intent(Settings.ACTION_ADD_ACCOUNT)) },
     )
-}
-
-@Composable
-internal fun SignInScreen(
-    uiState: SignInUiState,
-    onContinueWithGoogle: () -> Unit,
-    onOpenAddAccountSettings: () -> Unit,
-    sessionExpiredNote: Boolean = false,
-) {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            // §7.15: "Signed out. Your entries are safe on this device." -- shown alongside
-            // Idle/InProgress only; a real error from THIS attempt (NetworkFailure,
-            // TokenRejected, ...) is more specific and takes the banner slot instead.
-            if (sessionExpiredNote && (uiState is SignInUiState.Idle || uiState is SignInUiState.InProgress)) {
-                LedgerBanner(
-                    text = "Signed out. Your entries are safe on this device.",
-                    tone = LedgerBannerTone.Warning,
-                    modifier = Modifier.padding(bottom = 16.dp),
-                )
-            }
-
-            when (uiState) {
-                is SignInUiState.NoGoogleAccountOnDevice -> {
-                    LedgerBanner(
-                        text = "No Google account on this device",
-                        tone = LedgerBannerTone.Warning,
-                    )
-                    LedgerPillButton(
-                        text = "Add a Google account",
-                        onClick = onOpenAddAccountSettings,
-                        modifier = Modifier.padding(top = 16.dp),
-                    )
-                }
-
-                is SignInUiState.NetworkFailure -> {
-                    LedgerBanner(text = uiState.message, tone = LedgerBannerTone.Error)
-                    LedgerPillButton(
-                        text = "Try again",
-                        onClick = onContinueWithGoogle,
-                        modifier = Modifier.padding(top = 16.dp),
-                    )
-                }
-
-                is SignInUiState.TokenRejected -> {
-                    LedgerBanner(text = "Sign-in failed.", tone = LedgerBannerTone.Error)
-                    LedgerPillButton(
-                        text = "Try again",
-                        onClick = onContinueWithGoogle,
-                        modifier = Modifier.padding(top = 16.dp),
-                    )
-                }
-
-                is SignInUiState.InProgress -> {
-                    CircularProgressIndicator()
-                }
-
-                is SignInUiState.Idle, is SignInUiState.Success -> {
-                    LedgerPillButton(
-                        text = "Continue with Google",
-                        onClick = onContinueWithGoogle,
-                        enabled = uiState !is SignInUiState.InProgress,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Preview(fontScale = 1.0f)
-@Preview(fontScale = 2.0f)
-@Composable
-private fun SignInScreenIdlePreview() {
-    LedgerTheme {
-        SignInScreen(uiState = SignInUiState.Idle, onContinueWithGoogle = {}, onOpenAddAccountSettings = {})
-    }
-}
-
-@Preview
-@Composable
-private fun SignInScreenNoAccountPreview() {
-    LedgerTheme {
-        SignInScreen(
-            uiState = SignInUiState.NoGoogleAccountOnDevice,
-            onContinueWithGoogle = {},
-            onOpenAddAccountSettings = {},
-        )
-    }
 }

@@ -6,12 +6,22 @@ import com.dumbopanda.ledger.core.datastore.LedgerDataStoreFactory
 import com.dumbopanda.ledger.core.datastore.SessionStore
 import com.dumbopanda.ledger.core.datastore.copy
 import com.dumbopanda.ledger.core.network.dto.ProfileConsentUpdateDto
+import com.dumbopanda.ledger.core.network.dto.ProfileDetailsFetchDto
+import com.dumbopanda.ledger.core.network.dto.ProfileDetailsUpdateDto
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.first
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+
+// C14's own outcome shape, mirroring AccountDeletionOutcome/SyncOutcome's own file-local
+// sealed-type convention rather than a shared generic result -- see those types' own comments.
+sealed interface ProfileDetailsFetch {
+    data class Found(val displayName: String?, val age: Int?, val location: String?, val occupation: String?) : ProfileDetailsFetch
+    data object NotSignedIn : ProfileDetailsFetch
+    data object Failed : ProfileDetailsFetch
+}
 
 // §7.2 pane 3 / §11.4. Starts at 1, not 0: 0 is ConsentState's own proto3 "never accepted"
 // default, and a version that collides with "unset" would make a genuine v1 policy
@@ -73,6 +83,32 @@ class ProfileRepository @Inject constructor(
                 filter { eq("user_id", userId) }
             }
         }.onFailure { e -> Log.w(TAG, "syncConsentToServerIfNeeded failed, will retry next sign-in", e) }
+    }
+
+    // C14: ProfileSetupViewModel's own "Checking" state -- whether this account has already
+    // been through the "tell us about yourself" step, same "ask the server, don't guess from
+    // local state" shape AccountSetupViewModel's hasAnyAccount() check uses for the same reason
+    // (a second device, or a reinstall, must not re-ask someone who already answered).
+    suspend fun fetchProfileDetails(): ProfileDetailsFetch {
+        val userId = sessionStore.read()?.userId ?: return ProfileDetailsFetch.NotSignedIn
+        return runCatching {
+            val dto = supabase.postgrest.from("profiles")
+                .select { filter { eq("user_id", userId) } }
+                .decodeSingle<ProfileDetailsFetchDto>()
+            ProfileDetailsFetch.Found(dto.displayName, dto.age, dto.location, dto.occupation)
+        }.getOrElse { e -> Log.w(TAG, "fetchProfileDetails failed", e); ProfileDetailsFetch.Failed }
+    }
+
+    suspend fun saveProfileDetails(displayName: String, age: Int?, location: String?, occupation: String?): Result<Unit> {
+        val userId = sessionStore.read()?.userId ?: return Result.failure(IllegalStateException("Not signed in"))
+        return runCatching {
+            supabase.postgrest.from("profiles").update(
+                ProfileDetailsUpdateDto(displayName = displayName, age = age, location = location, occupation = occupation),
+            ) {
+                filter { eq("user_id", userId) }
+            }
+            Unit
+        }.onFailure { e -> Log.e(TAG, "saveProfileDetails failed", e) }
     }
 
     private companion object {

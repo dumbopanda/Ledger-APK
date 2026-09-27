@@ -15,7 +15,10 @@ object LedgerDestinations {
     const val SIGN_IN = "sign_in"
     const val SIGN_IN_EXPIRED = "sign_in_expired"
     const val RESTORING = "restoring"
-    const val ACCOUNT_SETUP = "account_setup"
+    const val PROFILE_SETUP = "profile_setup"
+    const val APP_TOUR = "app_tour"
+    // C15: Account setup is no longer its own destination -- see LedgerNavHost's HOME
+    // composable, where it now renders as a popup over Home itself.
     const val FORCED_UPDATE = "forced_update"
     const val HOME = "home"
     const val HOME_SESSION_EXPIRED = "home_session_expired"

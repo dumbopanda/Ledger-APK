@@ -38,7 +38,7 @@ class AccountSetupViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<AccountSetupUiState>(AccountSetupUiState.Checking)
     val uiState: StateFlow<AccountSetupUiState> = _uiState.asStateFlow()
 
-    private var rows = listOf(AccountSetupRow(), AccountSetupRow())
+    private var rows = listOf(AccountSetupRow())
 
     init {
         viewModelScope.launch {
@@ -60,6 +60,19 @@ class AccountSetupViewModel @Inject constructor(
         _uiState.value = readyState()
     }
 
+    // A suggestion chip toggles: tapped once it fills the first blank row (or adds one), tapped
+    // again it takes that row back out -- leaving one blank row if it was the only one.
+    fun useSuggestion(name: String) {
+        val existing = rows.firstOrNull { it.name.trim().equals(name, ignoreCase = true) }
+        val blank = rows.firstOrNull { it.name.isBlank() }
+        rows = when {
+            existing != null -> rows.filterNot { it.id == existing.id }.ifEmpty { listOf(AccountSetupRow()) }
+            blank != null -> rows.map { if (it.id == blank.id) it.copy(name = name, error = null) else it }
+            else -> rows + AccountSetupRow(name = name)
+        }
+        _uiState.value = readyState()
+    }
+
     fun removeRow(id: String) {
         if (rows.size <= 1) return
         rows = rows.filterNot { it.id == id }
@@ -67,6 +80,7 @@ class AccountSetupViewModel @Inject constructor(
     }
 
     fun confirm() {
+        if ((_uiState.value as? AccountSetupUiState.Ready)?.saving == true) return
         if (rows.none { it.name.isNotBlank() }) {
             val firstId = rows.first().id
             rows = rows.map { if (it.id == firstId) it.copy(error = "Add at least one account") else it }

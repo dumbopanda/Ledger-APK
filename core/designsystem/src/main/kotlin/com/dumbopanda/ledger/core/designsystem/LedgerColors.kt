@@ -51,6 +51,12 @@ val EditedInk = Color(0xFF8A5A0F)
 val SwitchOff = Color(0xFFD8D5CB) // .slider (off)
 val CountOnDark = Color(0xFF2C312E) // .sub-tab.active .count
 
+// First-run flow (onboarding + sign-in): the dark hero surfaces sit on CanvasDark.
+val InactiveOnDark = Color(0xFFC9D3C7) // idle segment of the Sign in / Sign up pill
+val PlaceholderInk = Color(0xFF8A877F) // input placeholder and leading-icon ink on white fields
+val TrackOnDark = Color(0x0FFFFFFF) // 6% white: pill tracks and ghost buttons on CanvasDark
+val TrackBorderOnDark = Color(0x1FFFFFFF) // 12% white: their 1px border
+
 /**
  * The web tints tiles/tags/dots by account NAME (Domestic mint, International amber, Cash
  * stone). The APK has N user-named accounts, so the same three tones are handed out by the
