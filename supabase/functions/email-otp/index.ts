@@ -7,9 +7,9 @@ import nodemailer from "nodemailer";
 //   POST { action: "send",   email }        -> emails a fresh code
 //   POST { action: "verify", email, code }  -> returns a Supabase session
 //
-// Every limit (5-min expiry, 60s cooldown, hourly/daily caps, 5 wrong guesses,
+// Every limit (5-min expiry, 2-min resend cooldown, hourly/daily caps, 5 wrong guesses,
 // consume-on-success) is enforced by otp_issue()/otp_check() in
-// 0011_email_otp.sql, not here. This function only generates the code,
+// 0011_email_otp.sql and 0013, not here. This function only generates the code,
 // hashes it, sends the email, and mints the session after otp_check() says ok.
 //
 // Secrets: OTP_PEPPER (HMAC key for stored code hashes), GMAIL_USER and
@@ -23,8 +23,18 @@ const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// The public delete-account page (GitHub Pages) calls this from a browser, so it needs CORS.
+// Only that origin; the Android app sends no Origin header and isn't affected.
+const CORS = {
+  "Access-Control-Allow-Origin": "https://dumbopanda.github.io",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+  "Vary": "Origin",
+};
+
 export default {
   async fetch(req: Request): Promise<Response> {
+    if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
     let body: { action?: string; email?: string; code?: string };
@@ -159,5 +169,5 @@ async function sendEmail(to: string, code: string): Promise<void> {
 }
 
 function json(body: unknown, status = 200): Response {
-  return Response.json(body, { status });
+  return Response.json(body, { status, headers: CORS });
 }
