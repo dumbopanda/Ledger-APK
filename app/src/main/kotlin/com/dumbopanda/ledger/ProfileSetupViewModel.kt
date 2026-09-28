@@ -106,8 +106,9 @@ class ProfileSetupViewModel @Inject constructor(
         }
 
         val age = state.age.toIntOrNull()
-        if (state.age.isNotBlank() && (age == null || age !in 13..120)) {
-            _uiState.value = state.copy(ageError = "Enter a valid age")
+        // The Terms and the Play listing say 18 and over; the server allows 13-120, this is stricter.
+        if (state.age.isNotBlank() && (age == null || age !in 18..120)) {
+            _uiState.value = state.copy(ageError = if (age != null && age < 18) "Ledger is for people 18 and over." else "Enter your age in years, like 27.")
             return
         }
 

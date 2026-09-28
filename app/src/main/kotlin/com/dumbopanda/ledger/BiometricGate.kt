@@ -3,13 +3,12 @@ package com.dumbopanda.ledger
 import android.os.SystemClock
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -20,6 +19,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -29,7 +35,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.dumbopanda.ledger.core.designsystem.component.LedgerPillButton
+import com.dumbopanda.ledger.core.designsystem.CanvasDark
+import com.dumbopanda.ledger.core.designsystem.Lime
+import com.dumbopanda.ledger.core.designsystem.MutedOnDark
+import com.dumbopanda.ledger.core.designsystem.SystemChrome
+import com.dumbopanda.ledger.core.designsystem.SystemChromeEffect
+import com.dumbopanda.ledger.core.designsystem.component.DisplayHeadline
+import com.dumbopanda.ledger.core.designsystem.component.LedgerBrandMark
+import com.dumbopanda.ledger.core.designsystem.component.LimeButton
+import com.dumbopanda.ledger.core.designsystem.webText
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
@@ -102,19 +116,28 @@ fun BiometricGate(
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text("Ledger is locked", style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(16.dp))
-            LedgerPillButton(
-                text = "Unlock",
-                onClick = { promptFailed = false },
-            )
-        }
+    SystemChromeEffect(SystemChrome.Dark)
+    Column(
+        modifier = Modifier.fillMaxSize().background(CanvasDark).padding(horizontal = 24.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.weight(1f))
+        LedgerBrandMark(
+            72.dp,
+            Modifier.drawBehind {
+                drawCircle(Brush.radialGradient(listOf(Lime.copy(alpha = 0.25f), Color.Transparent), radius = 110.dp.toPx()), radius = 110.dp.toPx())
+            },
+        )
+        Spacer(Modifier.height(28.dp))
+        DisplayHeadline("Ledger is", "locked.", size = 32f, breakBeforeAccent = false, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Use your fingerprint or your phone's PIN to open it.",
+            style = webText(15f, FontWeight.Normal, MutedOnDark, lineHeight = 22f),
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.weight(1f))
+        LimeButton(text = "Unlock", onClick = { promptFailed = false })
     }
 }
 

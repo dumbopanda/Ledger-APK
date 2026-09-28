@@ -521,6 +521,9 @@ private fun overflowsAmount(raw: String): Boolean {
 private fun padDecimals(amount: AmountFieldValue): AmountFieldValue {
     val clean = amount.clean
     if (clean.isEmpty()) return amount
+    // A zero is no amount: padding it to "0.00" left a field that typing garbled (the caret
+    // landed among the zeros), so it clears back to empty instead.
+    if (clean.toDoubleOrNull() == 0.0) return AmountFieldValue("", 0)
     val padded = if ('.' in clean) {
         val whole = clean.substringBefore('.').ifEmpty { "0" }
         val frac = (clean.substringAfter('.') + "00").take(2)
