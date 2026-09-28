@@ -4,6 +4,22 @@ About 650 names and domain variants checked across eight rounds. Domains were ch
 
 Not checked: trademarks (IP India's search has a CAPTCHA) and Instagram handles (login wall). Do both before buying.
 
+## Keeping "Ledger" with a prefix or suffix .com (checked 28 Sept 2026)
+
+224 forms of "ledger" were checked on .com. 34 were free. The rest, including theledgerapp.com, getledger.com, myledger.com, tryledger.com, useledger.com and heyledger.com, are taken.
+
+| Form | .com | .app | .in |
+|---|---|---|---|
+| **usetheledger** | **free** | **free** | **free** |
+| **gettheledger** | **free** | taken | **free** |
+| **theledgerapp** (matches the support email) | taken | **free** | **free** |
+| **dearledger** | **free** | **free** | **free** |
+| **meriledger** ("my ledger" in Hindi) | **free** | **free** | **free** |
+
+Other free .com forms: theledgerhq, theledgerindia, theledgerapps, getledgerhq, myledgerhq, getledgerbook, useledgerbook, tryledgerapp, useledgerapp, ledgerappco, ledgerapphq, ledgerappindia, ledgerappin, myrupeeledger, ledgerforme, ledgerforyou, cannyledger, frugalledger, harledger, ekledger, sabledger, dinledger, oweledger, simplestledger, cleanestledger, tiniestledger, ledgerbuddyapp, ledgerandroid, ledgerthe, ledgerbyme.
+
+**The risk isn't the domain.** Play search for "ledger" returns about 18 apps in both the US and India. They include Ledger Live (`com.ledger.live`, from the crypto wallet company that holds the "Ledger" trademark) and several expense trackers with the same name: Daily Ledger, Money Ledger, Pocket Ledger and Ledger Book. So a website doesn't fix the trademark risk or the store discoverability problem.
+
 ## Can a real single word get a .com? (checked 28 Sept 2026)
 
 - **About 740 real single English words checked on .com: 0 unregistered.** Nearly all were registered in the 1990s and 2000s.
