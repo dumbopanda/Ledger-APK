@@ -1,10 +1,39 @@
 # Name search, 28 Sept 2026
 
-About 450 names checked across five rounds. Domains were checked against the registries' own RDAP services (Verisign for .com, Google Registry for .app, NIXI for .in). "Free" means not registered. A registrar may still price it as premium. Play checks searched the Play Store in India for apps whose title or package ID contains the name.
+About 650 names and domain variants checked across eight rounds. Domains were checked against the registries' own RDAP services (Verisign for .com, Google Registry for .app, NIXI for .in). "Free" means not registered. A registrar may still price it as premium. Play checks searched the Play Store in India for apps whose title or package ID contains the name.
 
 Not checked: trademarks (IP India's search has a CAPTCHA) and Instagram handles (login wall). Do both before buying.
 
-## Global finalists (the app may go global, so these come first)
+## One-word finalists (owner's rule: a single, real, meaningful word)
+
+About 210 single words were checked. Every one is taken on .com, and almost every one on .app. So a one-word brand will use another ending (.co, .io, .in, .money) or a prefix form (useword.com, wordhq.com). Play checks searched the US and India stores.
+
+| Name | Meaning | Free domains | Play US / IN |
+|---|---|---|---|
+| **Purser** | The ship's officer who keeps the accounts and the valuables | purser.in, purser.co, purser.io, purser.me, purserapp.app | Only "Purser Time Clock" (unrelated) |
+| **Tenner** | A ten note (₹10, £10), used in Indian and British English | tenner.in, tenner.co, tenner.io, tenner.money, tenner.me, tennerhq.com, gettenner.com | No matches |
+| **Recount** | Count again, and tell the story | recount.co, recount.io, recount.money, recount.me, userecount.com, recounthq.com | "Recount: Your Life, Your Pace", a journaling app that owns recount.app |
+| **Shrewd** | Sharp with money | shrewd.co, shrewd.io, shrewd.me | No matches |
+
+### Risks per one-word finalist
+
+- **Purser:** slightly old-fashioned. Some people will think of airline cabin crew.
+- **Tenner:** means a small note, not tracking or remembering. Less familiar in the US.
+- **Recount:** a journaling app already uses the name and owns recount.app. Also recalls election recounts.
+- **Shrewd:** can read as cunning. No .com form is free.
+
+### Ruled out: existing money apps with the same name
+
+- **Budget and expense apps:** Steward ("Steward - Budget & Expense"), Bursar ("Split Fair Settle Even"), Quits ("Split Bills & Expenses"), Magpie ("Minding Your Money"), Teller ("Accounting & Stock").
+- **Savings apps:** Kept (a bank's savings app), Moneybox, Chipmunk (savings jars), Billfold (an expense tracker).
+- **Bookkeeping and portfolio apps:** Coffer (portfolio tracker), Pika (a bookkeeper), Docket (receipts).
+- **Other finance brands:** Nib (insurer and bank), Tether (crypto), Folio (wallet), Anchor (bitcoin, savings), Earnest (US lender), Safekeeping (a custody fintech), Custodian (investments), Parity (crypto).
+
+### Ruled out: taken on every checked domain, or crowded on Play
+
+Recall, Memo, Tally, Settle, Balance, Ledger-like words (Register, Roster, Codex, Folio, Slate, Quire, Margin, Stub), Vault, Stash, Hoard, Purse, Pouch, Thrift, Keepsake, Memento, Heirloom, Registrar, Canny, Tidy, Steady, Jay, Hive, Harbor, Lantern, Trove, Quill.
+
+## Global finalists (two-word blends and made-up words, excluded by the one-word rule)
 
 A further ~210 English and coined names were checked. Nearly every real English word and short coined name is taken on .com. Play checks here searched both the US and India stores.
 
