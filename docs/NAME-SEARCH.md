@@ -1,6 +1,6 @@
 # Name search, 28 Sept 2026
 
-About 650 names and domain variants checked across eight rounds. Domains were checked against the registries' own RDAP services (Verisign for .com, Google Registry for .app, NIXI for .in). "Free" means not registered. A registrar may still price it as premium. Play checks searched the Play Store in India for apps whose title or package ID contains the name.
+Roughly 3,400 words and names checked. Domains were checked against the registries' own RDAP services (Verisign for .com, Google Registry for .app, NIXI for .in). "Free" means not registered. A registrar may still price it as premium. Play checks searched the Play Store for apps whose title or package ID contains the name: India only in the first rounds, then the US and India.
 
 Not checked: trademarks (IP India's search has a CAPTCHA) and Instagram handles (login wall). Do both before buying.
 
@@ -43,13 +43,13 @@ Plain name.com was checked first for about 125 names and sharp-mind words. Only 
 - **Clash with a money or finance brand:** Peerless (Peerless Securities), Perennial (Perennial Bank), Morningstar (investment research), Adamantine (Adamantine Pay), Surefire (a rewards platform), Chanakya (Chanakya Wealth, Savings Chanakya), Tenali (a gold-buying app), Entrust (a security company), Citadel (a hedge fund), Vaulted (a precious-metals app).
 - **Crowded or poor fit:** Birbal (story apps), Jeeves (Ask Jeeves), Fibonacci (trading tools), Corvid (sounds like Covid), Lovelace (an adult-film star), Commando (slang), Sentry (the app already uses Sentry).
 
-## One-word brand with a prefix or suffix .com (owner's choice, in progress)
+## One-word brand with a prefix or suffix .com (owner's choice: 108 strong names)
 
 The brand is one real word. The website is a free .com such as getword.com, wordapp.com, tryword.com, useword.com, wordhq.com, myword.com or heyword.com. Every name below had that .com unregistered on 28 Sept 2026 and was searched on the Play Store in the US and India. Names already used by a money app were removed.
 
-**So far: 50 strong (A and B tier) and 28 weaker (C tier).**
+**Result: 108 strong (26 A tier, 82 B tier) and 67 weaker (C tier).**
 
-### A tier: strong fit, clean on Play (19)
+### A tier: strong fit, clean on Play (26)
 
 | Name | .com | Meaning |
 |---|---|---|
@@ -72,18 +72,31 @@ The brand is one real word. The website is a free .com such as getword.com, word
 | Inkpot | getinkpot.com | ink for writing things down |
 | Bowerbird | bowerbirdhq.com | a bird that collects and keeps treasures |
 | Oaken | getoaken.com | made of oak; sturdy |
+| Stowed | usestowed.com | put safely away (enter and forget) |
+| Adamant | adamantapp.com | unbreakable; the root of "diamond" |
+| Unerring | getunerring.com | never wrong |
+| Unfailing | getunfailing.com | never down; never lets you down |
+| Sheen | trysheen.com | a bright polished shine |
+| Reynard | getreynard.com | the cunning fox of folk tales |
+| Honed | tryhoned.com | sharpened to an edge |
 
-### B tier: good fit, minor caveats (31)
+### B tier: good fit, minor caveats (82)
 
-Recount (userecount.com), Almoner (getalmoner.com), Figures (figuresapp.com), Heed (heyheed.com), Trunk (heytrunk.com), Chest (usechest.com), Plain (heyplain.com), Owing (owingapp.com), Confidant (useconfidant.com), Truthful (truthfulapp.com), Hazelnut (tryhazelnut.com), Knapsack (knapsackapp.com), Dependable (dependableapp.com), Dutiful (dutifulapp.com), Thorough (trythorough.com), Hideaway (usehideaway.com), Pannier (getpannier.com), Reticule (getreticule.com), Halfcrown (gethalfcrown.com), Promissory (promissoryapp.com), Inkstand (inkstandapp.com), Packrat (trypackrat.com), Jackdaw (myjackdaw.com), Shipshape (heyshipshape.com), Lucidity (heylucidity.com), Observant (observantapp.com), Holdall (getholdall.com), Carryall (getcarryall.com), Pennyweight (getpennyweight.com), Cofferer (getcofferer.com), Flyleaf (useflyleaf.com).
+- **Money and coins:** Tenpence (gettenpence.com), Twopence (gettwopence.com), Threepenny (getthreepenny.com), Halfcrown (gethalfcrown.com), Pennyweight (getpennyweight.com), Owing (owingapp.com), Promissory (promissoryapp.com), Figures (figuresapp.com), Yardstick (tryyardstick.com), Bougette (getbougette.com), Countinghouse (trycountinghouse.com), Cofferer (getcofferer.com), Almoner (getalmoner.com), Babbage (babbageapp.com).
+- **Keeping and carrying:** Strongbox (getstrongbox.com), Trunk (heytrunk.com), Chest (usechest.com), Knapsack (knapsackapp.com), Pannier (getpannier.com), Reticule (getreticule.com), Holdall (getholdall.com), Carryall (getcarryall.com), Kitbag (getkitbag.com), Drawstring (drawstringapp.com), Hideaway (usehideaway.com), Pocketed (pocketedapp.com), Squirreled (squirreledapp.com), Hazelnut (tryhazelnut.com), Packrat (trypackrat.com), Jackdaw (myjackdaw.com), Nuthatch (getnuthatch.com).
+- **Writing it down and remembering:** Recount (userecount.com), Remembrancer (getremembrancer.com), Inkstand (inkstandapp.com), Flyleaf (useflyleaf.com), Penned (trypenned.com), Heed (heyheed.com), Observant (observantapp.com).
+- **Secure, never wrong, never down:** Impeccable (tryimpeccable.com), Infallible (getinfallible.com), Faultless (getfaultless.com), Airtight (heyairtight.com), Deadbolt (deadboltapp.com), Foolproof (foolproofapp.com), Certitude (certitudeapp.com), Surefooted (surefootedapp.com), Tireless (gettireless.com), Enduring (getenduring.com), Unwavering (getunwavering.com), Unflagging (getunflagging.com), Unfaltering (getunfaltering.com), Ceaseless (getceaseless.com), Undaunted (undauntedapp.com), Cautious (cautiousapp.com), Soundly (trysoundly.com).
+- **Bright:** Burnished (burnishedapp.com), Noonday (getnoonday.com), Candescent (candescentapp.com), Lightfast (lightfasthq.com), Lucidity (heylucidity.com).
+- **Sharp, quick, easy:** Wily (mywily.com), Hawkeyed (gethawkeyed.com), Clearsighted (getclearsighted.com), Farsighted (getfarsighted.com), Deftly (trydeftly.com), Handily (handilyapp.com), Gumption (usegumption.com), Hoshiyar (gethoshiyar.com).
+- **Honest and steady:** Truthful (truthfulapp.com), Forthright (forthrightapp.com), Aboveboard (aboveboardapp.com), Upstanding (getupstanding.com), Scrupulous (getscrupulous.com), Evenhanded (getevenhanded.com), Levelheaded (trylevelheaded.com), Unruffled (unruffledapp.com), Dependable (dependableapp.com), Dutiful (dutifulapp.com), Thorough (trythorough.com), Confidant (useconfidant.com), Plain (heyplain.com), Shipshape (heyshipshape.com).
 
-### C tier: usable but weaker (28)
+### C tier: usable but weaker (67)
 
-Amends, Annal, Reckoning, Tot, Hoard, Honesty, Redress, Reconcile, Memorandum, Heirlooms, Figuring, Elephants, Haversack, Rucksack, Acquit, Constancy, Stalwart, Recollection, Lakh, Portmanteau, Seneschal, Annalist, Sparing, Diarist, Footnote, Quartermaster, Valise, Khazana.
+Amends, Annal, Reckoning, Tot, Hoard, Honesty, Redress, Reconcile, Memorandum, Heirlooms, Figuring, Elephants, Haversack, Rucksack, Acquit, Constancy, Stalwart, Recollection, Lakh, Portmanteau, Seneschal, Annalist, Sparing, Diarist, Footnote, Quartermaster, Valise, Khazana, Stiver, Trustful, Inkhorn, Copybook, Commonplace, Chatelaine, Pecunia, Scudo, Soldi, Nutkin, Kempt, Entered, Untroubled, Duly, Tucked, Treasured, Guarded, Spry, Unfading, Clinched, Lambent, Unsleeping, Calibrated, Tempered, Dawnlight, Cloudless, Stoat, Lilavati, Sagacious, Boffin, Muninn, Codicil, Thimbleful, Straightforward, Checkmark, Notelet, Resplendent, Unceasing, Aplomb.
 
-### Removed because a money app already uses the name (selection)
+### Removed because a money or finance app already uses the name (selection)
 
-Pennies, Rupee, Purse, Passbook, Daybook, Owe, Owed, IOU, Dues, Recoup, Reckon, Groat, Paymaster, Outlay, Coinage, Cashbox, Spender, Outgoings, Chequebook, Pocketbook, Bahi, Bachat, Rupiya, Kosh, Yaad, Munim, Sampatti, Punji, Daulat, Provident, Stockpile, Nightly, Simplicity.
+Pennies, Rupee, Purse, Passbook, Daybook, Owe, Owed, IOU, Dues, Recoup, Reckon, Groat, Paymaster, Outlay, Coinage, Cashbox, Spender, Outgoings, Chequebook, Pocketbook, Bahi, Bachat, Rupiya, Kosh, Yaad, Munim, Sampatti, Punji, Daulat, Provident, Stockpile, Nightly, Simplicity, Coffret, Fisc, Neatly, Stored, Earmarked, Peerless, Perennial, Brightly, Squarely, Evermore, Fortitude, Coppers, Chanakya, Tenali, Unshakable, Adamantine, Surefire.
 
 ## Keeping "Ledger" with a prefix or suffix .com (checked 28 Sept 2026)
 
