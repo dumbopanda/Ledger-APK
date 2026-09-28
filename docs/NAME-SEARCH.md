@@ -4,6 +4,15 @@ About 650 names and domain variants checked across eight rounds. Domains were ch
 
 Not checked: trademarks (IP India's search has a CAPTCHA) and Instagram handles (login wall). Do both before buying.
 
+## Can a real single word get a .com? (checked 28 Sept 2026)
+
+- **About 740 real single English words checked on .com: 0 unregistered.** Nearly all were registered in the 1990s and 2000s.
+- **191 of the best-fitting words checked for resale listings: 21 parked at a marketplace** (Afternic, Atom, Efty, Sedo, Dan, HugeDomains). The rest are in use or held privately.
+- **Only one showed a price:** purseful.com at about $1,795 on HugeDomains. The others say "make an offer" or "inquire". tenner.com, for example, is "considering selling" and gives only an email address.
+- **Listed for resale:** tenner, rupee, owing, stubs, amber (Efty or broker pages); pennies, canny, nib, jay, beaver (Atom); evened, numerals, casebook, annal, hoard, larder (Afternic); readies, trusty (Sedo); heedful (Dan); purseful (HugeDomains); margin (NameBright).
+
+So a real single word with a .com means buying from the current owner, usually for thousands of dollars.
+
 ## One-word finalists (owner's rule: a single, real, meaningful word)
 
 About 210 single words were checked. Every one is taken on .com, and almost every one on .app. So a one-word brand will use another ending (.co, .io, .in, .money) or a prefix form (useword.com, wordhq.com). Play checks searched the US and India stores.
