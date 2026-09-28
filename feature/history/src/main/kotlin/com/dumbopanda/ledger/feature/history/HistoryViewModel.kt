@@ -193,7 +193,7 @@ class HistoryViewModel @Inject constructor(
             month = month.value,
             today = today(),
             dayGroups = groupByDay.group(entries.take(shown)),
-            recentCount = entries.size,
+            recentCount = entries.distinctBy { it.transferGroup ?: it.id }.size, // a transfer is one thing that happened, as in Stats
             hasMore = entries.size > shown,
             syncMarks = syncMarks.value,
             owedToMeOpen = items.filter { it.isOpen }.sortedByDescending { it.openedDate },

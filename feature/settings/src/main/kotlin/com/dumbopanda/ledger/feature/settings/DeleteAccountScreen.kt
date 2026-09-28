@@ -3,19 +3,26 @@ package com.dumbopanda.ledger.feature.settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,16 +32,49 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dumbopanda.ledger.core.designsystem.CanvasDark
+import com.dumbopanda.ledger.core.designsystem.Coral
+import com.dumbopanda.ledger.core.designsystem.Forest
+import com.dumbopanda.ledger.core.designsystem.HairlineLt
+import com.dumbopanda.ledger.core.designsystem.Lime
+import com.dumbopanda.ledger.core.designsystem.MutedOnDark
+import com.dumbopanda.ledger.core.designsystem.PlaceholderInk
+import com.dumbopanda.ledger.core.designsystem.SystemChrome
+import com.dumbopanda.ledger.core.designsystem.SystemChromeEffect
+import com.dumbopanda.ledger.core.designsystem.TextDark
+import com.dumbopanda.ledger.core.designsystem.TextMuted
+import com.dumbopanda.ledger.core.designsystem.TrackOnDark
+import com.dumbopanda.ledger.core.designsystem.White
+import com.dumbopanda.ledger.core.designsystem.component.DisplayHeadline
+import com.dumbopanda.ledger.core.designsystem.component.FirstRunField
 import com.dumbopanda.ledger.core.designsystem.component.LedgerBanner
 import com.dumbopanda.ledger.core.designsystem.component.LedgerBannerTone
+import com.dumbopanda.ledger.core.designsystem.component.LedgerHeroSheet
+import com.dumbopanda.ledger.core.designsystem.component.LedgerMiniButton
 import com.dumbopanda.ledger.core.designsystem.component.LedgerPillButton
-import com.dumbopanda.ledger.core.designsystem.component.LedgerTextField
+import com.dumbopanda.ledger.core.designsystem.component.LimeButton
+import com.dumbopanda.ledger.core.designsystem.component.webBorder
+import com.dumbopanda.ledger.core.designsystem.icon.LedgerIcons
+import com.dumbopanda.ledger.core.designsystem.icon.LedgerLineIcons
+import com.dumbopanda.ledger.core.designsystem.webText
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun DeleteAccountRoute(
@@ -81,22 +121,23 @@ internal fun DeleteAccountScreen(
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) onExport(uri)
     }
+    val fullDark = uiState == DeleteAccountUiState.Deleted ||
+        uiState == DeleteAccountUiState.Deleting || uiState == DeleteAccountUiState.Reauthenticating
+    SystemChromeEffect(if (fullDark) SystemChrome.Dark else SystemChrome.DarkOverCream)
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        when (uiState) {
-            DeleteAccountUiState.Deleted -> DeletedContent(onDone)
-            DeleteAccountUiState.Deleting, DeleteAccountUiState.Reauthenticating -> ProgressContent(uiState)
-            is DeleteAccountUiState.EmailReauth -> EmailReauthContent(uiState, onReauthCodeChanged, onVerifyReauthCode, onResendReauthCode)
-            else -> ConfirmingContent(
-                uiState = uiState,
-                lastBackupAt = lastBackupAt,
-                onExport = { exportLauncher.launch("ledger-backup-${LocalDate.now()}.json") },
-                onDeleteTapped = {
-                    if (hasExportedThisSession) showTypeDeleteDialog = true else showBackupNudge = true
-                },
-                onCancel = onCancel,
-            )
-        }
+    when (uiState) {
+        DeleteAccountUiState.Deleted -> DeletedContent(onDone)
+        DeleteAccountUiState.Deleting, DeleteAccountUiState.Reauthenticating -> ProgressContent(uiState)
+        is DeleteAccountUiState.EmailReauth -> EmailReauthContent(uiState, onReauthCodeChanged, onVerifyReauthCode, onResendReauthCode, onCancel)
+        else -> ConfirmingContent(
+            uiState = uiState,
+            lastBackupAt = lastBackupAt,
+            onExport = { exportLauncher.launch("ledger-backup-${LocalDate.now()}.json") },
+            onDeleteTapped = {
+                if (hasExportedThisSession) showTypeDeleteDialog = true else showBackupNudge = true
+            },
+            onCancel = onCancel,
+        )
     }
 
     // §7.17 step 2: "prominent, and the flow does not push past it quietly" -- an explicit
@@ -104,11 +145,17 @@ internal fun DeleteAccountScreen(
     if (showBackupNudge) {
         AlertDialog(
             onDismissRequest = { showBackupNudge = false },
-            title = { Text("You haven't saved a backup") },
-            text = { Text("Once your account is deleted there's no undo. Save a file first if you want to keep a copy.") },
+            containerColor = White,
+            title = { Text("Keep a copy first?", style = webText(20f, FontWeight.ExtraBold, TextDark)) },
+            text = {
+                Text(
+                    "Once your account is deleted there's no undo. Save a file of your entries before you go.",
+                    style = webText(15f, FontWeight.Normal, TextMuted, lineHeight = 22f),
+                )
+            },
             confirmButton = {
                 LedgerPillButton(
-                    text = "Save a backup",
+                    text = "Save file",
                     onClick = {
                         showBackupNudge = false
                         exportLauncher.launch("ledger-backup-${LocalDate.now()}.json")
@@ -119,14 +166,12 @@ internal fun DeleteAccountScreen(
                 TextButton(onClick = {
                     showBackupNudge = false
                     showTypeDeleteDialog = true
-                }) { Text("Continue without backing up") }
+                }) { Text("Delete without saving", style = webText(14f, FontWeight.Bold, Coral)) }
             },
         )
     }
 
-    // §7.17 step 3: the first "type a word to confirm" pattern in this codebase -- an
-    // AlertDialog + OutlinedTextField, matching the AlertDialog shape every other destructive
-    // confirmation here already uses (EntryDetailSheet's delete dialog, SignOutGuardDialog).
+    // §7.17 step 3: "type a word to confirm".
     if (showTypeDeleteDialog) {
         TypeDeleteDialog(
             onDismiss = { showTypeDeleteDialog = false },
@@ -146,119 +191,173 @@ private fun ConfirmingContent(
     onDeleteTapped: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Text("Delete your account", style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(16.dp))
-        // Step 1: "exactly what is deleted... and that it is immediate and irreversible."
-        Text(
-            // C13: was "your Google sign-in link" -- now true for either sign-in method.
-            "This deletes your entries, your accounts, your profile, and your sign-in. " +
-                "It happens immediately and cannot be undone.",
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        Spacer(Modifier.height(24.dp))
-
-        if (uiState is DeleteAccountUiState.ReauthFailed) {
-            LedgerBanner(text = uiState.message, tone = LedgerBannerTone.Error)
-            Spacer(Modifier.height(16.dp))
-        }
-        if (uiState is DeleteAccountUiState.DeleteFailed) {
-            LedgerBanner(text = "Couldn't delete your account: ${uiState.message}", tone = LedgerBannerTone.Error)
-            Spacer(Modifier.height(16.dp))
-        }
-
-        OutlinedButton(onClick = onExport, modifier = Modifier.fillMaxWidth()) {
-            Text("Save a backup file")
-        }
-        Text(
-            text = if (lastBackupAt != null) "Last backup: $lastBackupAt" else "No backup saved yet",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-
-        Spacer(Modifier.height(32.dp))
-        LedgerPillButton(text = "Delete my account", onClick = onDeleteTapped, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(8.dp))
-        TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
-    }
+    LedgerHeroSheet(
+        hero = {
+            Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 32.dp)) {
+                Eyebrow("Delete account")
+                DisplayHeadline("Delete your account.", "Everything, for good.", size = 30f, modifier = Modifier.semantics { heading() })
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "It happens the moment you confirm, on every phone you use. There's no undo.",
+                    style = webText(15f, FontWeight.Normal, MutedOnDark, lineHeight = 22f),
+                )
+            }
+        },
+        sheetTop = {
+            if (uiState is DeleteAccountUiState.ReauthFailed) {
+                LedgerBanner(text = uiState.message, tone = LedgerBannerTone.Error)
+                Spacer(Modifier.height(16.dp))
+            }
+            if (uiState is DeleteAccountUiState.DeleteFailed) {
+                LedgerBanner(text = "Couldn't delete your account: ${uiState.message}", tone = LedgerBannerTone.Error)
+                Spacer(Modifier.height(16.dp))
+            }
+            Text("What gets deleted", style = webText(15f, FontWeight.Bold, TextDark))
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GoneItem("Every entry", Modifier.weight(1f))
+                GoneItem("Your accounts", Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GoneItem("Your profile", Modifier.weight(1f))
+                GoneItem("Your sign-in", Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(22.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(White, RoundedCornerShape(22.dp))
+                    .webBorder(HairlineLt, RoundedCornerShape(22.dp))
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Want to keep a copy?", style = webText(15f, FontWeight.Bold, TextDark))
+                    Text(
+                        lastBackupAt?.let { "File saved ${it.atZone(ZoneId.systemDefault()).format(SAVED_AT)}" } ?: "No file saved yet",
+                        style = webText(13f, FontWeight.Normal, TextMuted),
+                    )
+                }
+                LedgerMiniButton("Save file", onExport)
+            }
+        },
+        sheetBottom = {
+            DangerButton("Delete my account", onDeleteTapped)
+            CancelLink(onCancel)
+        },
+    )
 }
 
 @Composable
 private fun ProgressContent(uiState: DeleteAccountUiState) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier.fillMaxSize().background(CanvasDark).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        CircularProgressIndicator()
-        Spacer(Modifier.height(16.dp))
+        CircularProgressIndicator(color = Lime)
+        Spacer(Modifier.height(20.dp))
         Text(
-            if (uiState == DeleteAccountUiState.Reauthenticating) "Verifying it's you..." else "Deleting your account...",
-            style = MaterialTheme.typography.bodyLarge,
+            if (uiState == DeleteAccountUiState.Reauthenticating) "Checking it's you…" else "Deleting your account…",
+            style = webText(16f, FontWeight.SemiBold, White),
         )
     }
 }
 
 // C13: step 4 for an email-sign-in account -- a fresh code to the already-signed-in address
-// (shown, never editable: unlike feature:auth's sign-in flow, there's nothing to type here)
-// stands in for Credential Manager's picker. Verifying it goes straight into delete(), same as
-// a matched Google re-auth would.
+// (shown, never editable) stands in for Credential Manager's picker. Verifying it goes straight
+// into delete(), same as a matched Google re-auth would.
 @Composable
 private fun EmailReauthContent(
     uiState: DeleteAccountUiState.EmailReauth,
     onCodeChanged: (String) -> Unit,
     onVerify: () -> Unit,
     onResend: () -> Unit,
+    onCancel: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Verify it's you", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            "Enter the 6-digit code sent to ${uiState.email} to confirm deletion.",
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        if (uiState.error != null) {
-            LedgerBanner(text = uiState.error, tone = LedgerBannerTone.Error)
-        }
-        if (uiState.sending) {
-            CircularProgressIndicator()
-        } else {
-            LedgerTextField(
-                value = uiState.code,
-                onValueChange = onCodeChanged,
-                label = "6-digit code",
-                keyboardType = KeyboardType.NumberPassword,
-                isError = uiState.error != null,
-            )
-            LedgerPillButton(
-                text = "Verify and delete",
-                onClick = onVerify,
-                enabled = !uiState.verifying && uiState.code.length == 6,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            TextButton(onClick = onResend, enabled = uiState.resendInS <= 0) {
-                Text(if (uiState.resendInS > 0) "Resend code in ${uiState.resendInS}s" else "Resend code")
+    LedgerHeroSheet(
+        hero = {
+            Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 32.dp)) {
+                Eyebrow("One last check")
+                DisplayHeadline("Check your", "inbox.", size = 30f, breakBeforeAccent = false, modifier = Modifier.semantics { heading() })
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "We sent a 6-digit code to ${uiState.email}. Enter it to delete your account.",
+                    style = webText(15f, FontWeight.Normal, MutedOnDark, lineHeight = 22f),
+                )
             }
-        }
-    }
+        },
+        sheetTop = {
+            if (uiState.sending) {
+                Text("Sending your code…", style = webText(15f, FontWeight.SemiBold, TextMuted))
+            } else {
+                Text("Enter code", style = webText(13f, FontWeight.SemiBold, TextMuted))
+                Spacer(Modifier.height(8.dp))
+                // A one-time code, not a password: marked as one so Android offers to fill it
+                // from the email instead of offering to save it in the password manager.
+                FirstRunField(
+                    value = uiState.code,
+                    onValueChange = onCodeChanged,
+                    placeholder = "6-digit code",
+                    isError = uiState.error != null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (uiState.code.length == 6) onVerify() }),
+                    autofill = ContentType.SmsOtpCode,
+                    description = "6-digit code",
+                )
+                if (uiState.error != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(uiState.error, style = webText(13f, FontWeight.SemiBold, Coral))
+                }
+                Spacer(Modifier.height(6.dp))
+                val canResend = uiState.resendInS <= 0
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(enabled = canResend, role = Role.Button, onClick = onResend),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Didn't get it?", style = webText(14f, FontWeight.Normal, TextMuted))
+                    Text(
+                        if (canResend) "Resend code" else "Resend in %d:%02d".format(uiState.resendInS / 60, uiState.resendInS % 60),
+                        style = webText(14f, FontWeight.Bold, if (canResend) Forest else PlaceholderInk),
+                    )
+                }
+            }
+        },
+        sheetBottom = {
+            DangerButton(
+                if (uiState.verifying) "Checking your code…" else "Delete my account",
+                onVerify,
+                enabled = !uiState.sending && !uiState.verifying && uiState.code.length == 6,
+            )
+            CancelLink(onCancel)
+        },
+    )
 }
 
 @Composable
 private fun DeletedContent(onDone: () -> Unit) {
     // Step 7: "Confirmation screen -> Onboarding."
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier.fillMaxSize().background(CanvasDark).padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
     ) {
-        Text("Your account has been deleted", style = MaterialTheme.typography.headlineSmall)
+        Spacer(Modifier.weight(1f))
+        Box(Modifier.size(72.dp).background(TrackOnDark, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(LedgerLineIcons.Check, contentDescription = null, tint = Lime, modifier = Modifier.size(34.dp))
+        }
+        Spacer(Modifier.height(28.dp))
+        DisplayHeadline("Your account is", "gone.", size = 30f, breakBeforeAccent = false, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
         Spacer(Modifier.height(12.dp))
         Text(
-            "Everything on your account is gone. This device's local copy has been cleared too.",
-            style = MaterialTheme.typography.bodyLarge,
+            "Everything on it has been erased, and this phone's copy is cleared too.",
+            style = webText(15f, FontWeight.Normal, MutedOnDark, lineHeight = 22f),
+            textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(24.dp))
-        LedgerPillButton(text = "Continue", onClick = onDone)
+        Spacer(Modifier.weight(1f))
+        LimeButton(text = "Continue", onClick = onDone)
     }
 }
 
@@ -267,19 +366,68 @@ private fun TypeDeleteDialog(onDismiss: () -> Unit, onConfirmed: () -> Unit) {
     var typed by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Type DELETE to confirm") },
+        containerColor = White,
+        title = { Text("Type DELETE to confirm", style = webText(20f, FontWeight.ExtraBold, TextDark)) },
         text = {
             Column {
-                Text("This is the last step. It cannot be undone.")
+                Text("This is the last step. There's no undo.", style = webText(15f, FontWeight.Normal, TextMuted, lineHeight = 22f))
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(value = typed, onValueChange = { typed = it }, singleLine = true, label = { Text("DELETE") })
+                FirstRunField(
+                    value = typed,
+                    onValueChange = { typed = it },
+                    placeholder = "DELETE",
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false),
+                    description = "Type DELETE",
+                )
             }
         },
-        confirmButton = {
-            LedgerPillButton(text = "Delete forever", onClick = onConfirmed, enabled = typed == "DELETE")
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
+        confirmButton = { DangerButton("Delete forever", onConfirmed, enabled = typed.trim() == "DELETE", fill = false) },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", style = webText(14f, FontWeight.Bold, Forest)) } },
     )
 }
+
+@Composable
+private fun Eyebrow(text: String) {
+    Text(text.uppercase(), style = webText(12f, FontWeight.ExtraBold, Lime, letterSpacing = 1.4f))
+    Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun GoneItem(text: String, modifier: Modifier) {
+    Row(
+        modifier.background(White, RoundedCornerShape(14.dp)).webBorder(HairlineLt, RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(LedgerIcons.Close, contentDescription = null, tint = Coral, modifier = Modifier.size(18.dp))
+        Text(text, style = webText(14f, FontWeight.SemiBold, TextDark))
+    }
+}
+
+// Red, not the app's usual forest green: this button destroys things.
+@Composable
+private fun DangerButton(text: String, onClick: () -> Unit, enabled: Boolean = true, fill: Boolean = true) {
+    Box(
+        (if (fill) Modifier.fillMaxWidth() else Modifier)
+            .heightIn(min = if (fill) 56.dp else 44.dp)
+            .clip(CircleShape)
+            .background(if (enabled) Coral else HairlineLt)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 22.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = webText(if (fill) 16f else 14f, FontWeight.Bold, if (enabled) White else TextMuted))
+    }
+}
+
+@Composable
+private fun CancelLink(onCancel: () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onCancel),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("Keep my account", style = webText(14f, FontWeight.Bold, Forest))
+    }
+}
+
+private val SAVED_AT = DateTimeFormatter.ofPattern("d MMM, HH:mm", Locale.UK)
