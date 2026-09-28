@@ -4,6 +4,45 @@ About 650 names and domain variants checked across eight rounds. Domains were ch
 
 Not checked: trademarks (IP India's search has a CAPTCHA) and Instagram handles (login wall). Do both before buying.
 
+## Personality shortlist (added 28 Sept 2026)
+
+The owner's brief: tough and secure but bright, not military. Shiny like daylight, two taps and done, never wrong, never down. Plus a sharp side: knowledgeable, quick, cunning. Personal names are welcome.
+
+Plain name.com was checked first for about 125 names and sharp-mind words. Only one was free (merlinfalcon), so every name below uses a prefix or suffix .com. Each one had no clashing money app on the Play Store in the US or India.
+
+### Bright, unbreakable, never down
+
+| Name | .com | Traits | Play US / IN |
+|---|---|---|---|
+| **Unfailing** | getunfailing.com | never down, never lets you down | no matches |
+| **Unerring** | getunerring.com | never wrong | no matches |
+| **Adamant** | adamantapp.com | unbreakable; the root of "diamond" | one crypto messenger package |
+| **Sheen** | trysheen.com | bright polished shine | no matches |
+| **Foolproof** | foolproofapp.com | so simple it cannot go wrong | unrelated titles only |
+| **Airtight** | heyairtight.com | secure, nothing gets in | no matches |
+| **Stowed** | usestowed.com | enter it and it is safely away | no matches |
+| **Burnished** | burnishedapp.com | polished to a shine | no matches |
+| **Noonday** | getnoonday.com | the brightest part of the day | no matches |
+| **Impeccable** | tryimpeccable.com | flawless | no matches |
+| **Tireless** | gettireless.com | always on | no matches |
+| **Enduring** | getenduring.com | always there | one package |
+| **Deadbolt** | deadboltapp.com | the lock that cannot be slipped | no matches |
+
+### Sharp, quick, clever
+
+| Name | .com | Traits | Play US / IN |
+|---|---|---|---|
+| **Reynard** | getreynard.com, reynardapp.com | the cunning fox of folk tales | one unrelated toolbox package |
+| **Wily** | mywily.com | cunning and quick | a signage company, Wilyer |
+| **Babbage** | babbageapp.com | Charles Babbage, who designed the first computer | an Indian coaching class |
+| **Hoshiyar** | gethoshiyar.com | smart and alert (Hindi) | no matches |
+
+### Taken or ruled out for this personality
+
+- **Every form taken:** Sterling, Quartz, Zenith, Daylight, Heyday, Diamond, Crystal, Radiant, Aurora, Summit, Apex, Bolt, Cinch, Pronto, Presto, Ace, Flawless, Private, Meridian, Durable, Penny, Alfred, Felix, Milo, Otto, Merlin, Athena, Pascal.
+- **Clash with a money or finance brand:** Peerless (Peerless Securities), Perennial (Perennial Bank), Morningstar (investment research), Adamantine (Adamantine Pay), Surefire (a rewards platform), Chanakya (Chanakya Wealth, Savings Chanakya), Tenali (a gold-buying app), Entrust (a security company), Citadel (a hedge fund), Vaulted (a precious-metals app).
+- **Crowded or poor fit:** Birbal (story apps), Jeeves (Ask Jeeves), Fibonacci (trading tools), Corvid (sounds like Covid), Lovelace (an adult-film star), Commando (slang), Sentry (the app already uses Sentry).
+
 ## One-word brand with a prefix or suffix .com (owner's choice, in progress)
 
 The brand is one real word. The website is a free .com such as getword.com, wordapp.com, tryword.com, useword.com, wordhq.com, myword.com or heyword.com. Every name below had that .com unregistered on 28 Sept 2026 and was searched on the Play Store in the US and India. Names already used by a money app were removed.
