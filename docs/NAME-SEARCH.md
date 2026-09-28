@@ -4,6 +4,48 @@ About 650 names and domain variants checked across eight rounds. Domains were ch
 
 Not checked: trademarks (IP India's search has a CAPTCHA) and Instagram handles (login wall). Do both before buying.
 
+## One-word brand with a prefix or suffix .com (owner's choice, in progress)
+
+The brand is one real word. The website is a free .com such as getword.com, wordapp.com, tryword.com, useword.com, wordhq.com, myword.com or heyword.com. Every name below had that .com unregistered on 28 Sept 2026 and was searched on the Play Store in the US and India. Names already used by a money app were removed.
+
+**So far: 50 strong (A and B tier) and 28 weaker (C tier).**
+
+### A tier: strong fit, clean on Play (19)
+
+| Name | .com | Meaning |
+|---|---|---|
+| Tenner | gettenner.com | a ten note (₹10, £10) |
+| Tuppence | gettuppence.com | two pennies; a tiny sum |
+| Halfpenny | gethalfpenny.com | half a penny |
+| Farthing | getfarthing.com | a quarter penny, the smallest coin |
+| Smidgen | trysmidgen.com | a tiny amount |
+| Pennyworth | trypennyworth.com | value for money |
+| Pence | penceapp.com | pennies |
+| Takings | gettakings.com | money taken in |
+| Canny | trycanny.com | shrewd and careful with money |
+| Notecase | getnotecase.com | a wallet for banknotes |
+| Strongroom | getstrongroom.com | a vault for valuables |
+| Cubbyhole | getcubbyhole.com | a small snug storage nook |
+| Granary | trygranary.com | a storehouse for the harvest |
+| Discretion | trydiscretion.com | keeping things private |
+| Breadcrumbs | breadcrumbshq.com | a trail you can follow back |
+| Jotted | tryjotted.com | written down quickly |
+| Inkpot | getinkpot.com | ink for writing things down |
+| Bowerbird | bowerbirdhq.com | a bird that collects and keeps treasures |
+| Oaken | getoaken.com | made of oak; sturdy |
+
+### B tier: good fit, minor caveats (31)
+
+Recount (userecount.com), Almoner (getalmoner.com), Figures (figuresapp.com), Heed (heyheed.com), Trunk (heytrunk.com), Chest (usechest.com), Plain (heyplain.com), Owing (owingapp.com), Confidant (useconfidant.com), Truthful (truthfulapp.com), Hazelnut (tryhazelnut.com), Knapsack (knapsackapp.com), Dependable (dependableapp.com), Dutiful (dutifulapp.com), Thorough (trythorough.com), Hideaway (usehideaway.com), Pannier (getpannier.com), Reticule (getreticule.com), Halfcrown (gethalfcrown.com), Promissory (promissoryapp.com), Inkstand (inkstandapp.com), Packrat (trypackrat.com), Jackdaw (myjackdaw.com), Shipshape (heyshipshape.com), Lucidity (heylucidity.com), Observant (observantapp.com), Holdall (getholdall.com), Carryall (getcarryall.com), Pennyweight (getpennyweight.com), Cofferer (getcofferer.com), Flyleaf (useflyleaf.com).
+
+### C tier: usable but weaker (28)
+
+Amends, Annal, Reckoning, Tot, Hoard, Honesty, Redress, Reconcile, Memorandum, Heirlooms, Figuring, Elephants, Haversack, Rucksack, Acquit, Constancy, Stalwart, Recollection, Lakh, Portmanteau, Seneschal, Annalist, Sparing, Diarist, Footnote, Quartermaster, Valise, Khazana.
+
+### Removed because a money app already uses the name (selection)
+
+Pennies, Rupee, Purse, Passbook, Daybook, Owe, Owed, IOU, Dues, Recoup, Reckon, Groat, Paymaster, Outlay, Coinage, Cashbox, Spender, Outgoings, Chequebook, Pocketbook, Bahi, Bachat, Rupiya, Kosh, Yaad, Munim, Sampatti, Punji, Daulat, Provident, Stockpile, Nightly, Simplicity.
+
 ## Keeping "Ledger" with a prefix or suffix .com (checked 28 Sept 2026)
 
 224 forms of "ledger" were checked on .com. 34 were free. The rest, including theledgerapp.com, getledger.com, myledger.com, tryledger.com, useledger.com and heyledger.com, are taken.
