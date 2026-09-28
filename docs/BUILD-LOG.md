@@ -2792,4 +2792,41 @@ Still open: Privacy Policy page and Data Safety form don't mention email
   sign-in or age/location/occupation; cream system splash flashes before the
   dark onboarding; Stats' Money in/spend ignore loans by design now, so a
   loan-heavy month can look quiet (Owed to me shows them).
+
+## Mon 28 Sep · S21 — pre-release list worked top to bottom
+Privacy and Play:
+  - Privacy Policy rewritten for email sign-in, the name, optional
+    age/city/occupation, how sign-in codes are kept (hashed code + email + IP,
+    cleared within ~2 days), Gmail as sender, new backup path. Terms: sign-in
+    is Google or an email code. Dated 28 Sep.
+  - Real gap: the public delete-account page was Google-only, so email-only
+    users couldn't delete on the web (Play requires it). Added an email-code
+    path; email-otp now answers CORS for https://dumbopanda.github.io only
+    (deployed v4; the app sends no Origin and is unaffected).
+  - All four public pages rebranded to the app's system (shared
+    assets/ledger.css: Plus Jakarta Sans, ink hero + white/lime display
+    headline, cream sheet, forest pills with the lime dot). No em dashes.
+  - docs/PLAY-LISTING.md: Data Safety answers updated (name, optional profile
+    answers, crash logs; IP call left to owner), description rewritten.
+Tested with real codes:
+  - Web deletion for an email-only user (+webdel1): verified, deleted, server
+    shows no auth user / profile / accounts / entries.
+  - Sign out -> sign back in (+setup4): went straight to Home; balances,
+    loan history and both opening balances restored exactly.
+  - In-app deletion (+setup4): backup nudge -> type DELETE -> email code ->
+    deleted; server confirms no user; app returns to onboarding.
+  - Found on the way and fixed: delete button was green; the code box was a
+    password field (Android offered to save the code as a password); resend
+    countdown format differed; old backup wording. Whole flow restyled.
+Release prep: 0.3.0 (5); portrait only; lock screen in brand (compiles; can't
+  show on the emulator without setting a screen lock); optional age now 18+
+  to match the Terms; a 0 amount clears to empty instead of "0.00"; History's
+  Recent count counts a transfer once.
+Decided not to change: the cream launch screen. It must be one colour, cream
+  matches Home on every normal launch; dark would only fix first install.
+Moved BUILD-LOG, KNOWN-ISSUES, PLAY-LISTING and the stress-test report into
+  ledger-app/docs/ (scanned for secrets first).
+Not done, needs a real phone (tomorrow): signed release build, Google sign-in,
+  fingerprint/PIN lock and the new lock screen. CI: couldn't read Actions
+  results from here (no gh, private repo); owner to check the Database run.
 ```
