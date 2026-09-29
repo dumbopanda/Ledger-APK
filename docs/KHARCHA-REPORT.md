@@ -8,8 +8,8 @@ How it was checked: 80 kharcha variations looked up directly with the registries
 
 - **"Kharcha" on its own is off the table.** kharcha.com has been held privately since 2013 (no website, not for sale), kharcha.app and kharcha.in are taken, and **28 Play Store apps** already use "kharcha" in their name. Five are called plain "Kharcha".
 - **The market leader is "Kharcha Book: Expense Tracker"** by Undivided: 100,000+ downloads, rated 4.5 from 2,173 reviews.
-- **The space is heating up.** Sixteen kharcha domains were registered in 2025 and 2026, and at least eight have live expense-tracker or finance websites.
-- **But a two-word kharcha name still works, and cheaply.** 58 kharcha .com names are unregistered, and 15 of the best were checked on the Play Store with no app using the name.
+- **The space is heating up.** Eleven kharcha domains were registered in 2025 and 2026, and at least five run live expense-tracker or finance websites.
+- **But a two-word kharcha name still works, and cheaply.** 57 kharcha .com names are unregistered, and 15 of the best were checked on the Play Store with no app using the name.
 - **Top pick: Kharcha Kahan** ("where did the spending go"). kharchakahan.com, .app and .in are all free, and no app uses the name. It says exactly what the app does.
 
 ## 2. What it costs (Porkbun, today)
@@ -71,7 +71,7 @@ kharchaa, trykharcha, usekharcha, kharchahq, kharchalog, kharchanote, kharchadai
 | kharch.com | 1999 | Held, blocked website |
 | kharche.com | 1999 | An architecture firm (Kharche & Associates) |
 | **kharchawise.com** | 2025 | **Live competitor:** "Best Kharcha App, Expense Tracker & Budget Manager" |
-| **kharchakitab.com** | recent | **Live competitor:** "Hinglish Voice Expense Tracker for India" |
+| **kharchakitab.com** | not retrieved | **Live competitor:** "Hinglish Voice Expense Tracker for India" |
 | **apnakharcha.com** | 2025 | **Live competitor:** expense and room management for students |
 | **kharchadiary.com** | 2025 | **Live site:** "Kharcha Diary" |
 | **kharchanama.com** | 2026 | **Live site:** investment calculator and wealth tracker |
@@ -125,10 +125,10 @@ Related: "Paisa Kahan Gaya" (`com.paisakahangaya.android`) is an existing app wi
 
 ## 7. Risks to weigh
 
-1. **Crowded word.** 28 apps and 8 live websites share "kharcha". Your name must stand apart: "Kharcha Kahan" does, while "Kharcha Tracker" or "Kharcha Book" would not.
+1. **Crowded word.** 28 apps and at least five live expense or finance websites share "kharcha". Your name must stand apart: "Kharcha Kahan" does, while "Kharcha Tracker" or "Kharcha Book" would not.
 2. **Hard to trademark.** "Kharcha" is an everyday Hindi word, so nobody owns it alone. A distinctive pairing like "Kharcha Kahan" is more protectable than "Kharcha App", but still check IP India before buying.
 3. **India only.** A Hindi name speaks directly to Indian users but closes the door on a global launch, which was on the table earlier.
-4. **Speed.** Sixteen kharcha domains were registered in 2025 and 2026. A free name today may not be free next month.
+4. **Speed.** Eleven kharcha domains were registered in 2025 and 2026. A free name today may not be free next month.
 
 ## 8. Next steps
 
