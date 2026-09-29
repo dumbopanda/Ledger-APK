@@ -4,6 +4,21 @@ Roughly 3,400 words and names checked. Domains were checked against the registri
 
 Not checked: trademarks (IP India's search has a CAPTCHA) and Instagram handles (login wall). Do both before buying.
 
+## Track My Money and Trace My Money (checked 30 Sept 2026)
+
+| | trackmymoney | tracemymoney |
+|---|---|---|
+| **.com** | taken since 2002, held by NameFind (GoDaddy's portfolio). **For sale: $14,499** on Afternic | taken since 2017. **For sale: $2,988** on Afternic (seller "Lasvegashookups"), make-offer allowed |
+| **.app** | taken | **free** |
+| **.in** | **free** | **free** |
+| **Play Store (US and India)** | **three money apps already use the name:** "TrackMyMoney", "TrackMyMoney - AI Insights", "Track My Money" | **no apps** |
+
+**Free .com variations:** gettracemymoney, trytracemymoney, usetracemymoney, tracemymoneyapp, tracemymoneyhq, tracemymoneyindia, traceyourmoney, mymoneytrace, tracemyrupee, tracemypaisa, tracemyexpenses, gettrackmymoney, trytrackmymoney, mytrackmymoney, trackmymoneyhq, trackmymoneyindia, trackmyrupees, trackmyious. Every one of these is also free on .app and .in.
+
+**Taken variations:** trackyourmoney, trackthemoney, tracethemoney, trackmycash, tracemycash, trackmyspend, trackmyspending, trackmyexpenses, trackmoney, tracemoney, moneytrace, mymoneytracker.
+
+**Caveats:** both are three-word descriptive phrases, so they're hard to register as a trademark and break the earlier one-word rule. "Trace my money" is also wording used by lost-money and scam-recovery services, which could colour first impressions.
+
 ## Personality shortlist (added 28 Sept 2026)
 
 The owner's brief: tough and secure but bright, not military. Shiny like daylight, two taps and done, never wrong, never down. Plus a sharp side: knowledgeable, quick, cunning. Personal names are welcome.
