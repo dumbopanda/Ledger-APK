@@ -151,6 +151,54 @@ Nothing is deleted or re-created in step 2. Each service gains the brand identit
 - Convert the Play account from personal to organization (needs a company and a free D-U-N-S number).
 - Payments profile, Supabase and Sentry billing, and GitHub organization ownership move to the company.
 
+## Email on spentmap.com (decided approach, researched 30 Sept 2026)
+
+### Recommendation
+
+**Start free now, and upgrade to one Google Workspace Base user only when launching publicly or earning.** Only one inbox is ever needed: every address forwards into it.
+
+| Stage | Setup | Cost |
+|---|---|---|
+| **Now** | Cloudflare Email Routing (receive) into the existing theledgerapp.support@gmail.com, plus Brevo free (send sign-in codes, and let Gmail "Send mail as" support@spentmap.com) | ₹0 |
+| **Public launch or revenue** | Google Workspace Base, 1 user (admin@spentmap.com). All other addresses become aliases or groups of that one user. | ₹99 per user per month (₹49.50 for the first 3 months), about ₹1,188 a year plus GST |
+| Cheaper paid alternative | Zoho Mail Lite, 1 user | ₹59 per user per month billed yearly, about ₹708 a year plus GST |
+
+Skipped: Microsoft 365 Business Basic (₹170 per user per month) and Porkbun Email (about ₹260 per user per month). Both cost more for what this project needs.
+
+### Addresses (5, all into one inbox)
+
+| Address | Purpose |
+|---|---|
+| support@spentmap.com | Users, the Play listing contact, app Settings, Instagram bio |
+| privacy@spentmap.com | Privacy policy and the DPDP grievance contact |
+| no-reply@spentmap.com | Sender of sign-in codes (Reply-To: support@) |
+| admin@spentmap.com | Brand Google account: Play Console, Google Cloud, Supabase, GitHub, Sentry |
+| hello@spentmap.com (optional) | Press, partners, marketing |
+
+Safety rule: the **domain registrar and Cloudflare logins must not use an @spentmap.com address.** If the domain breaks, those are the accounts needed to fix it. Keep them on an independent email with 2-step verification.
+
+### Setup order
+
+1. Buy spentmap.com (Porkbun, $11.08 a year).
+2. Move DNS to Cloudflare (free). GitHub Pages works fine behind it.
+3. Cloudflare Email Routing: create the 5 addresses, forwarding to theledgerapp.support@gmail.com.
+4. Brevo: add spentmap.com as a sender domain and publish its SPF, DKIM and DMARC records in Cloudflare.
+5. Gmail: "Send mail as" support@spentmap.com through Brevo's SMTP relay.
+6. Create the free brand Google account on admin@spentmap.com (verification arrives through the forwarding).
+7. email-otp function: switch secrets from Gmail SMTP to Brevo, sender no-reply@spentmap.com. Test delivery to Gmail and Outlook before switching.
+
+### Free-tier limits checked
+
+- **Cloudflare Email Routing:** 200 addresses per domain plus catch-all, unlimited inbound.
+- **Brevo free:** 300 emails a day.
+- **Resend free:** 100 a day, 3 domains.
+- **Zoho Forever Free:** 5 mailboxes of 5 GB each, no IMAP, select regions only.
+- **Porkbun forwarding:** 20 addresses.
+- **ImprovMX free:** 25 addresses, 500 forwards a day.
+- **Cloudflare Email Sending:** needs Workers Paid at $5 a month, which includes 3,000 emails.
+
+If sign-in codes ever exceed 300 a day, Brevo's paid plans start at about ₹625 a month.
+
 ## Upcoming costs
 
 | Item | When | Cost |
