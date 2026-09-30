@@ -25,7 +25,7 @@ No build has been uploaded to Play yet, and the 15 to 20 lined-up testers have n
 |---|---|---|
 | 1 | New package ID (permanent after first upload) | `com.spentmap.app` (matches the owned domain). Fallback: `com.dumbopanda.spentmap`. |
 | 2 | Rename internal code too? | Not now. Rename everything users see plus the package ID; keep "Ledger" as the internal code name. |
-| 3 | Support and sign-in email | support@spentmap.com, with sign-in codes sent through Brevo or Resend (fixes the Gmail sending limit). Fallback: a new Gmail address. |
+| 3 | Support and sign-in email | **Decided:** one Google Workspace Base user (admin@spentmap.com) with 4 aliases, from day one. Sign-in codes go out through Brevo's free plan as no-reply@spentmap.com, isolated from the admin mailbox. No Gmail is used, so users never see one. See "Email on spentmap.com". |
 | 4 | Where the policy pages live | spentmap.com/privacy, /terms, /delete-account, still hosted free on GitHub Pages. |
 | 5 | Play title (30 characters max) | "Spent Map: Expense Tracker" (26) or "Spent Map" |
 | 6 | Tagline and positioning | Owner's call. Options: "See where your money went." / "Every rupee, mapped." / "Know where it went. Know who owes you." (keeps the IOU side visible) |
@@ -49,7 +49,7 @@ No build has been uploaded to Play yet, and the 15 to 20 lined-up testers have n
    - Add https://spentmap.com as an authorized JavaScript origin on the web client, for the delete page.
 3. **Domain:**
    - GitHub Pages custom domain for spentmap.com, with HTTPS.
-   - Email: forwarding for support@, plus SPF, DKIM and DMARC records for the sending service.
+   - Email: Google Workspace (MX records), Brevo sender verification, and SPF, DKIM and DMARC records covering both. Full steps in "Email on spentmap.com".
 4. **Play Console:**
    - Create the app as "Spent Map" (nothing uploaded yet).
    - Set the developer name, and the public contact email to support@spentmap.com.
@@ -73,9 +73,11 @@ No build has been uploaded to Play yet, and the 15 to 20 lined-up testers have n
 
 ### Phase 3 (Claude): backend
 
-1. `email-otp`: subject, text, HTML and sender name to Spent Map, and switch sending to the new address or service. Update the function secrets.
-2. CORS allowlist: add https://spentmap.com (and www). Redeploy.
-3. `supabase/config.toml` `project_id`: cosmetic, local only.
+1. `email-otp`: subject, text, HTML and sender name to Spent Map. Replace the Gmail SMTP sender (nodemailer, `GMAIL_USER` and `GMAIL_APP_PASSWORD` secrets) with Brevo (API key or SMTP secret), sending as `no-reply@spentmap.com` with `Reply-To: support@spentmap.com`. Remove the two Gmail secrets once verified.
+2. **Global daily send cap (abuse protection).** Count codes issued in the last 24 hours (from `email_otps`); above a limit set below Brevo's 300 a day (start at 250), stop sending, return a friendly "try again later" to the app, and alert the owner once. This sits on top of the existing per-email, per-IP and per-code limits. Add a pgTAP test for it.
+3. Optional: a free bot check (Cloudflare Turnstile) on the sign-up screen, only if the cap ever trips from bot traffic.
+4. CORS allowlist: add https://spentmap.com (and www). Redeploy.
+5. `supabase/config.toml` `project_id`: cosmetic, local only.
 
 ### Phase 4 (Claude): public pages
 
@@ -93,7 +95,7 @@ No build has been uploaded to Play yet, and the 15 to 20 lined-up testers have n
 
 1. Fresh install of the new package.
 2. Google sign-in through the new Android client.
-3. Email sign-in, checking the new sender name arrives in the inbox and not in spam (test Gmail and Outlook).
+3. Email sign-in, checking the new sender name arrives in the inbox and not in spam (test Gmail and Outlook), and that "show original" reveals no Gmail address. Also confirm the global daily cap pauses sending and alerts.
 4. Restore from an **old Ledger backup file**.
 5. The biometric lock prompt text.
 6. Account deletion in the app and on the new web page.
@@ -117,7 +119,9 @@ Kotlin packages, the `Ledger*` classes, the build plugin IDs (`ledger.android.*`
 | Google sign-in breaks | The new Android client is created before the app build changes, and is tested first in Phase 6. |
 | Old backups stop restoring | A new test restores a `ledger` backup. |
 | Links to the old pages break | The old GitHub Pages URLs keep forwarding until Play Console is updated. |
-| Sign-in emails go to spam from a new domain | SPF, DKIM and DMARC, plus a test send to Gmail and Outlook before switching. |
+| Sign-in emails go to spam from a new domain | SPF, DKIM and DMARC covering Workspace and Brevo, plus a test send to Gmail and Outlook before switching. |
+| Sign-in form abused, sender suspended | Codes go through Brevo, not the admin mailbox, so a suspension only stops codes and never locks the owner out of Play Console or Google Cloud. A global daily cap (Phase 3) stops it before Brevo's 300 a day is exhausted. |
+| Sign-in breaks when the old Gmail is retired | The Gmail is only deleted after the Brevo switch is verified live (see "Retiring theledgerapp.support@gmail.com"). |
 
 ## Effort
 
@@ -125,12 +129,12 @@ About 3 working sessions for Claude (app, backend and pages, verification), plus
 
 ## Moving accounts to a Spent Map identity
 
-Today the Play developer account, GitHub, Sentry, Supabase and Google Cloud all hang off the owner's personal Google account. The goal is to separate the product from the personal identity without breaking anything, at close to zero cost.
+Today the Play developer account, GitHub, Sentry, Supabase and Google Cloud all hang off the owner's personal Google account. The goal is to separate the product from the personal identity without breaking anything, at low cost.
 
-### Step 1: one brand identity (₹0)
+### Step 1: one brand identity (Workspace Base, about ₹99 a month)
 
-1. After buying spentmap.com, create admin@spentmap.com and support@spentmap.com. Either forward them free to the personal inbox with Cloudflare Email Routing, or use a free mailbox (Zoho Mail's free plan).
-2. Create a free Google account using admin@spentmap.com (Google accepts non-Gmail addresses). This becomes the product's admin login.
+1. After buying spentmap.com, sign up for Google Workspace Base and create the single user admin@spentmap.com. Add support@, privacy@, hello@ and no-reply@ as aliases of that user (see "Email on spentmap.com").
+2. admin@spentmap.com is the product's admin login. It is a real Workspace account with admin recovery controls, not a forwarding trick.
 3. Store every login in a password manager (e.g. Bitwarden free), with 2-step verification on each.
 
 ### Step 2: add the brand identity everywhere, then shift what's public
@@ -142,7 +146,7 @@ Today the Play developer account, GitHub, Sentry, Supabase and Google Cloud all 
 | **GitHub** | Create a free organization (e.g. `spentmap`) and transfer both repos into it. History and issues move with them, and old URLs redirect. Set git to commit with the GitHub no-reply email from now on. | ₹0 |
 | **Supabase** | Invite admin@spentmap.com to the organization as Owner, or transfer the project to a new Spent Map organization. The project URL and keys stay the same, so the app needs no change. | ₹0 now |
 | **Sentry** | The free Developer plan allows 1 user, so change the login email on the existing account to admin@spentmap.com instead of adding a second member. | ₹0 |
-| **Sign-in email sender** | Move from theledgerapp.support@gmail.com to support@spentmap.com through Brevo (free, 300 emails a day) or Resend (free, 100 a day). | ₹0 |
+| **Sign-in email sender** | Move from theledgerapp.support@gmail.com to no-reply@spentmap.com through Brevo's free plan (300 emails a day). Sign up for Brevo with admin@spentmap.com. | ₹0 |
 
 Nothing is deleted or re-created in step 2. Each service gains the brand identity first, and the personal account can step back later.
 
@@ -151,53 +155,84 @@ Nothing is deleted or re-created in step 2. Each service gains the brand identit
 - Convert the Play account from personal to organization (needs a company and a free D-U-N-S number).
 - Payments profile, Supabase and Sentry billing, and GitHub organization ownership move to the company.
 
-## Email on spentmap.com (decided approach, researched 30 Sept 2026)
+## Email on spentmap.com (decided 30 Sept 2026)
 
-### Recommendation
+### Decision
 
-**Start free now, and upgrade to one Google Workspace Base user only when launching publicly or earning.** Only one inbox is ever needed: every address forwards into it.
+**Google Workspace Base from day one, one paid user, and sign-in codes sent through Brevo's free plan.** This replaces the earlier "free forwarding first" idea. Reasons:
 
-| Stage | Setup | Cost |
+- No Gmail with "ledger" in its name sits in the chain, and users never see a Gmail address anywhere.
+- One system to run: Google receives mail directly, so Cloudflare Email Routing is not needed. Cloudflare stays only as free DNS.
+- Replying as support@ is built in (Send mail as an alias).
+- The admin mailbox never sends bulk mail, so an abused sign-up form cannot get the mailbox that holds the Play Console and Google Cloud logins suspended.
+
+Why Brevo and not the free Gmail as a hidden sender: mail sent through Gmail's servers is signed by gmail.com, not spentmap.com, so some clients show "via gmail.com" or "on behalf of", delivery is weaker, and the old Ledger Gmail would have to be kept alive. Brevo is a background service, not a mailbox, signs as spentmap.com with the domain's own records, and shows nothing to users.
+
+| Piece | Choice | Cost |
 |---|---|---|
-| **Now** | Cloudflare Email Routing (receive) into the existing theledgerapp.support@gmail.com, plus Brevo free (send sign-in codes, and let Gmail "Send mail as" support@spentmap.com) | ₹0 |
-| **Public launch or revenue** | Google Workspace Base, 1 user (admin@spentmap.com). All other addresses become aliases or groups of that one user. | ₹99 per user per month (₹49.50 for the first 3 months), about ₹1,188 a year plus GST |
-| Cheaper paid alternative | Zoho Mail Lite, 1 user | ₹59 per user per month billed yearly, about ₹708 a year plus GST |
+| Mailbox | Google Workspace Base, **1 user** (admin@spentmap.com), 20 GB, up to 30 aliases per user | ₹99 per user per month (₹49.50 for the first 3 months), about ₹1,040 in year 1 plus 18% GST |
+| Sign-in codes | Brevo free plan, sending as no-reply@spentmap.com | ₹0 (300 emails a day) |
+| DNS | Cloudflare free (Porkbun DNS also works) | ₹0 |
 
-Skipped: Microsoft 365 Business Basic (₹170 per user per month) and Porkbun Email (about ₹260 per user per month). Both cost more for what this project needs.
+Create **one Workspace user with aliases, not five users.** Five users would cost five times as much (₹495 a month).
 
-### Addresses (5, all into one inbox)
+Skipped: Microsoft 365 Business Basic (₹170 per user per month), Porkbun Email (about ₹260 per user per month), and Zoho Mail Lite (₹59 per user per month billed yearly; the cheapest paid alternative if Google is ever too costly).
 
-| Address | Purpose |
-|---|---|
-| support@spentmap.com | Users, the Play listing contact, app Settings, Instagram bio |
-| privacy@spentmap.com | Privacy policy and the DPDP grievance contact |
-| no-reply@spentmap.com | Sender of sign-in codes (Reply-To: support@) |
-| admin@spentmap.com | Brand Google account: Play Console, Google Cloud, Supabase, GitHub, Sentry |
-| hello@spentmap.com (optional) | Press, partners, marketing |
+### Addresses (1 mailbox, 4 aliases)
 
-Safety rule: the **domain registrar and Cloudflare logins must not use an @spentmap.com address.** If the domain breaks, those are the accounts needed to fix it. Keep them on an independent email with 2-step verification.
+| Address | Kind | Display name | Purpose |
+|---|---|---|---|
+| admin@spentmap.com | The one Workspace user | Spent Map Admin | Brand login for Play Console, Google Cloud, Supabase, GitHub, Sentry, Brevo |
+| support@spentmap.com | Alias | Spent Map Support | Users, Play listing contact, app Settings, Instagram bio |
+| privacy@spentmap.com | Alias | Spent Map Privacy | Privacy policy and the DPDP grievance contact |
+| hello@spentmap.com | Alias (optional) | Spent Map | Press, partners, marketing |
+| no-reply@spentmap.com | Alias, sending identity only | Spent Map | Sender of sign-in codes through Brevo, with Reply-To: support@ |
+
+Add a Gmail filter per alias to keep them sorted into labels.
+
+Safety rule: the **domain registrar (Porkbun) and Cloudflare logins must not use an @spentmap.com address.** If the domain breaks, those are the accounts needed to fix it. Keep them on an independent email with 2-step verification.
 
 ### Setup order
 
-1. Buy spentmap.com (Porkbun, $11.08 a year).
-2. Move DNS to Cloudflare (free). GitHub Pages works fine behind it.
-3. Cloudflare Email Routing: create the 5 addresses, forwarding to theledgerapp.support@gmail.com.
-4. Brevo: add spentmap.com as a sender domain and publish its SPF, DKIM and DMARC records in Cloudflare.
-5. Gmail: "Send mail as" support@spentmap.com through Brevo's SMTP relay.
-6. Create the free brand Google account on admin@spentmap.com (verification arrives through the forwarding).
-7. email-otp function: switch secrets from Gmail SMTP to Brevo, sender no-reply@spentmap.com. Test delivery to Gmail and Outlook before switching.
+1. Buy spentmap.com (Porkbun, $11.08 a year). Use an independent email for the registrar login.
+2. Point DNS at Cloudflare (free). GitHub Pages works fine behind it.
+3. Sign up for Google Workspace Base, verify spentmap.com with the TXT record, and create admin@spentmap.com.
+4. Add the four aliases in the Workspace admin console, and add Google's MX records in Cloudflare.
+5. In Gmail, set up "Send mail as" for support@ and privacy@ so replies show the right address.
+6. Sign up for Brevo using admin@spentmap.com, add spentmap.com as a sender domain, and publish Brevo's DKIM and verification records in Cloudflare.
+7. Publish one SPF record that includes both Google and Brevo (a domain can have only one SPF record), Google's DKIM, and a DMARC record starting at `p=none`, moving to `quarantine` after a week of clean reports.
+8. Switch the `email-otp` function to Brevo (Phase 3), including the global daily cap. Test delivery to Gmail and Outlook, and confirm "show original" shows no Gmail address.
+9. Update the pages, Play listing and Google consent screen contact to support@ and privacy@spentmap.com.
 
-### Free-tier limits checked
+### Retiring theledgerapp.support@gmail.com
 
-- **Cloudflare Email Routing:** 200 addresses per domain plus catch-all, unlimited inbound.
-- **Brevo free:** 300 emails a day.
-- **Resend free:** 100 a day, 3 domains.
-- **Zoho Forever Free:** 5 mailboxes of 5 GB each, no IMAP, select regions only.
-- **Porkbun forwarding:** 20 addresses.
-- **ImprovMX free:** 25 addresses, 500 forwards a day.
-- **Cloudflare Email Sending:** needs Workers Paid at $5 a month, which includes 3,000 emails.
+It is the current sender for sign-in codes and is printed on the live privacy policy and terms, so retire it in this order:
 
-If sign-in codes ever exceed 300 a day, Brevo's paid plans start at about ₹625 a month.
+1. Brevo sending verified live (step 8 above).
+2. Pages, listing and app updated to the new addresses (step 9).
+3. Set the old Gmail to auto-forward everything to support@spentmap.com.
+4. Leave it for a few months until nothing points to it, then delete it. A deleted Gmail account is recoverable only for a short time, and an idle one costs nothing, so there is no rush.
+5. Any test users created with it lose their sign-in, so delete or re-create those test accounts first.
+
+### If a second mailbox is needed later
+
+Add a second Workspace user (another ₹99 a month), for a team member or a dedicated sending mailbox. There is one domain only (spentmap.com); no second domain is bought or planned.
+
+### Abuse protection
+
+- **Existing limits (email-otp):** one code per email every 2 minutes, at most 5 an hour and 10 a day per email, at most 20 an hour per IP, and a code dies after 5 wrong guesses.
+- **Added in Phase 3:** a global daily cap below Brevo's 300 a day, with an alert, so many rotating IPs cannot exhaust the quota or get the sender suspended. Optional Turnstile bot check.
+- **Blast radius:** if Brevo ever suspends sending, only sign-in codes stop. Google login still works, and so do the owner's admin accounts.
+
+### Limits and prices checked (30 Sept 2026)
+
+- **Google Workspace (India):** Base ₹99, Starter ₹270, Standard ₹1,080 (₹864 introductory) per user per month. Base allows up to 20 users, 20 GB pooled storage, 14-day trial.
+- **Brevo free:** 300 emails a day. Paid Starter from about ₹625 a month.
+- **Resend free (fallback sender):** 100 emails a day, 3 domains.
+- **Microsoft 365 Business Basic:** ₹170 per user per month, billed yearly, plus GST.
+- **Zoho Mail:** Mail Lite ₹59, Workplace Standard ₹99 per user per month billed yearly; a forever-free 5-user plan exists in select regions.
+- **Cloudflare Email Routing:** free, unlimited inbound; Email Sending needs Workers Paid at $5 a month.
+- **Porkbun:** free forwarding (20 addresses), Porkbun Email about $3 per user per month.
 
 ## Upcoming costs
 
@@ -205,12 +240,13 @@ If sign-in codes ever exceed 300 a day, Brevo's paid plans start at about ₹625
 |---|---|---|
 | spentmap.com | Now | about ₹950 a year (Porkbun $11.08) |
 | spentmap.in / .app (optional) | Now | about ₹675 a year / about ₹750, then ₹1,300 a year |
-| Brand Google account, GitHub org, email forwarding, Brevo/Resend, Sentry Developer, Supabase Free, Bitwarden | Now | ₹0 |
+| **Google Workspace Base, 1 user** (mailbox, aliases, admin login) | Now | ₹49.50 a month for the first 3 months, then ₹99 (about ₹1,040 in year 1) plus 18% GST |
+| GitHub org, Brevo free (sign-in codes), Cloudflare DNS, Sentry Developer, Supabase Free, Bitwarden | Now | ₹0 |
 | Trademark filing, class 9 (optional, recommended) | Soon | about ₹4,500 (online, individual or startup) |
 | Supabase Pro (daily backups, no pausing) | From public launch | $25 a month, about ₹2,150 |
-| Google Workspace mailbox (optional, instead of forwarding) | If wanted | roughly ₹150 to ₹200 per user per month; confirm current pricing |
+| Brevo paid plan | Only if sign-in codes exceed 300 a day | from about ₹625 a month |
 | Sentry Team (optional) | Only with teammates | $26 a month |
 | Company, D-U-N-S, organization Play account | When monetizing | LLP about ₹10,000 to ₹20,000 a year; D-U-N-S free (see LAUNCH-PLAN.md) |
 | Apple Developer Program | Only for iOS | $99 a year |
 
-**Before public launch:** about ₹950 to ₹2,400 a year for domains, plus the optional ₹4,500 trademark filing. **From public launch:** add about ₹2,150 a month for Supabase Pro.
+**Before public launch:** about ₹950 to ₹2,400 a year for domains, about ₹1,040 for Workspace in year 1 (plus GST), and the optional ₹4,500 trademark filing. **From public launch:** add about ₹2,150 a month for Supabase Pro.
